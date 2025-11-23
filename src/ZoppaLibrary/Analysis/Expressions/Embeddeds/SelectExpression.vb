@@ -1,0 +1,64 @@
+﻿Option Strict On
+Option Explicit On
+
+Namespace Analysis
+
+    ''' <summary>
+    ''' Select式を表す構造体です。
+    ''' この構造体は、マッチ式と式を保持し、式の型を提供します。
+    ''' </summary>
+    ''' <remarks>
+    ''' Select式は、特定の条件に基づいて値を選択するために使用されます。
+    ''' </remarks>
+    NotInheritable Class SelectExpression
+        Implements IExpression
+
+        ' マッチ式
+        Private ReadOnly _matchExpr As IExpression
+
+        ' 式
+        Private ReadOnly _expression As IExpression
+
+        ''' <summary>マッチ式を取得します。</summary>
+        ''' <returns>マッチ式。</returns>
+        ''' <remarks>
+        ''' このプロパティは、Select式のマッチ条件を表す式を返します。
+        ''' </remarks>
+        Public ReadOnly Property MatchExpr As IExpression
+            Get
+                Return _matchExpr
+            End Get
+        End Property
+
+        ''' <summary>コンストラクタ。</summary>
+        ''' <param name="matchExpr">マッチ式。</param>
+        ''' <param name="expression">式。</param>
+        Public Sub New(matchExpr As IExpression, expression As IExpression)
+            If matchExpr Is Nothing Then
+                Throw New ArgumentNullException(NameOf(matchExpr))
+            End If
+            If expression Is Nothing Then
+                Throw New ArgumentNullException(NameOf(expression))
+            End If
+            Me._matchExpr = matchExpr
+            Me._expression = expression
+        End Sub
+
+        ''' <summary>式の型を取得します。</summary>
+        ''' <returns>式の型。</returns>
+        Public ReadOnly Property Type As ExpressionType Implements IExpression.Type
+            Get
+                Return ExpressionType.SelectExpression
+            End Get
+        End Property
+
+        ''' <summary>式の値を取得します。</summary>
+        ''' <param name="venv">変数環境。</param>
+        ''' <returns>式の値。</returns>
+        Public Function GetValue(venv As AnalysisEnvironment) As IValue Implements IExpression.GetValue
+            Return _expression.GetValue(venv)
+        End Function
+
+    End Class
+
+End Namespace
