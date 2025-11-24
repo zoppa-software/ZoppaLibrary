@@ -5,6 +5,11 @@ Namespace Parser
 
     Public Module ExpressionEvaluate
 
+        Public Function Run(Of T)(expr As AnalysisEnvironment,
+                                  evaMethod As Func(Of AnalysisRange, IEnumerable(Of EvaluateAnswer), EvaluateAnswer)) As T
+            Return CType(RunSubroutine(expr.Answer, evaMethod).Value, T)
+        End Function
+
         Public Function Run(Of T)(expr As AnalysisRange,
                                   evaMethod As Func(Of AnalysisRange, IEnumerable(Of EvaluateAnswer), EvaluateAnswer)) As T
             Return CType(RunSubroutine(expr, evaMethod).Value, T)

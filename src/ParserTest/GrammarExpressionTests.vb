@@ -117,57 +117,62 @@ grammar = ( S , rule , S ) * ;"
     Public Sub Match_GrammarTest2()
         Dim input = "" &
 "digit = ? local_number ?;
-add_or_sub = digit, S, ('+' | '-'), S, digit;
+add_or_sub = digit, { S, ('+' | '-'), S, digit };
 S = { ' ' } ;
 grammar = add_or_sub;"
-        SyntaxAnalysis.AddSpecialMethods(
-            "local_number",
-            Function(tr As IPositionAdjustReader) As Boolean
-                Dim startPos = tr.Position
-                Dim readAny = False
-                While Char.IsDigit(ChrW(tr.Peek()))
-                    tr.Read()
-                    readAny = True
-                End While
-                Return readAny
-            End Function
+        Dim answer = SyntaxAnalysis.LexicalAnalysis(
+            input,
+            Sub(env)
+                env.Add(
+                    "local_number",
+                    Function(tr As IPositionAdjustReader) As Boolean
+                        Dim startPos = tr.Position
+                        Dim readAny = False
+                        While Char.IsDigit(ChrW(tr.Peek()))
+                            tr.Read()
+                            readAny = True
+                        End While
+                        Return readAny
+                    End Function
+                )
+            End Sub,
+            "grammar",
+            "10 + 20 - 5"
         )
-
-        Dim answer = SyntaxAnalysis.LexicalAnalysis(input, "grammar", "100 + 200")
     End Sub
 
 
     <Fact>
     Public Sub NumberTest1()
         Dim input = "number = ? Number ?;"
-        Dim ans1 = SyntaxAnalysis.LexicalAnalysis(input, "number", "+1.0")
-        Assert.Equal("+1.0", ans1.ToString())
-        Dim ans2 = SyntaxAnalysis.LexicalAnalysis("number", "3.1415")
+        Dim env = SyntaxAnalysis.LexicalAnalysis(input, "number", "+1.0")
+        Assert.Equal("+1.0", env.Answer.ToString())
+        Dim ans2 = env.LexicalAnalysis("number", "3.1415")
         Assert.Equal("3.1415", ans2.ToString())
-        Dim ans3 = SyntaxAnalysis.LexicalAnalysis("number", "-0.01")
+        Dim ans3 = env.LexicalAnalysis("number", "-0.01")
         Assert.Equal("-0.01", ans3.ToString())
-        Dim ans4 = SyntaxAnalysis.LexicalAnalysis("number", "5e+22")
+        Dim ans4 = env.LexicalAnalysis("number", "5e+22")
         Assert.Equal("5e+22", ans4.ToString())
-        Dim ans5 = SyntaxAnalysis.LexicalAnalysis("number", "1e06")
+        Dim ans5 = env.LexicalAnalysis("number", "1e06")
         Assert.Equal("1e06", ans5.ToString())
-        Dim ans6 = SyntaxAnalysis.LexicalAnalysis("number", "-2E-2")
+        Dim ans6 = env.LexicalAnalysis("number", "-2E-2")
         Assert.Equal("-2E-2", ans6.ToString())
-        Dim ans7 = SyntaxAnalysis.LexicalAnalysis("number", "6.626e-34")
+        Dim ans7 = env.LexicalAnalysis("number", "6.626e-34")
         Assert.Equal("6.626e-34", ans7.ToString())
 
         Assert.Throws(Of ArgumentException)(
             Sub()
-                SyntaxAnalysis.LexicalAnalysis("number", ".7")
+                env.LexicalAnalysis("number", ".7")
             End Sub
         )
         Assert.Throws(Of ArgumentException)(
             Sub()
-                SyntaxAnalysis.LexicalAnalysis("number", "7.")
+                env.LexicalAnalysis("number", "7.")
             End Sub
         )
         Assert.Throws(Of ArgumentException)(
             Sub()
-                SyntaxAnalysis.LexicalAnalysis("number", "3.e+20")
+                env.LexicalAnalysis("number", "3.e+20")
             End Sub
         )
     End Sub
