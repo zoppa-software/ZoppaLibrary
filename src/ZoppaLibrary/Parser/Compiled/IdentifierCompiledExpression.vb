@@ -36,20 +36,26 @@ Namespace Parser
         ''' <param name="ruleTable">ルールテーブル。</param>
         ''' <param name="specialMethods">特殊メソッドのテーブル。</param>
         ''' <param name="answers">解析結果を格納する範囲のリスト。</param>
+        ''' <param name="debugMode">デバッグモード。</param>
+        ''' <param name="messages">返却メッセージリスト。</param>
         ''' <returns>マッチした場合は true。それ以外は false。</returns>
         Public Function Match(tr As IPositionAdjustReader,
                               ruleTable As SortedDictionary(Of String, RuleCompiledExpression),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
-                              answers As List(Of AnalysisRange)) As Boolean Implements ICompiledExpression.Match
+                              answers As List(Of AnalysisRange),
+                              debugMode As Boolean,
+                              messages As DebugMessage) As Boolean Implements ICompiledExpression.Match
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
             Dim subAnswers As New List(Of AnalysisRange)()
 
             If ruleTable.ContainsKey(Me._name) Then
-                If ruleTable(Me._name).Pattern.Match(tr, ruleTable, specialMethods, subAnswers) Then
+                Dim currPos = tr.Position
+                If ruleTable(Me._name).Pattern.Match(tr, ruleTable, specialMethods, subAnswers, debugMode, messages) Then
                     answers.Add(New AnalysisRange(Me._name, subAnswers, tr, startPos, tr.Position))
                     Return True
                 Else
+                    messages.AddUnmatched($"ルール:'{Me._name}'が一致しません。位置:{currPos} '{tr.Substring(currPos)}'")
                     snap.Restore()
                     Return False
                 End If

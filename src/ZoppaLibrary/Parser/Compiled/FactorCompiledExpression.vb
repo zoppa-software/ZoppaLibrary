@@ -37,17 +37,21 @@ Namespace Parser
         ''' <param name="ruleTable">ルールテーブル。</param>
         ''' <param name="specialMethods">特殊メソッドのテーブル。</param>
         ''' <param name="answers">解析結果を格納する範囲のリスト。</param>
+        ''' <param name="debugMode">デバッグモード。</param>
+        ''' <param name="messages">返却メッセージリスト。</param>
         ''' <returns>マッチした場合は true。それ以外は false。</returns>
         Public Function Match(tr As IPositionAdjustReader,
                               ruleTable As SortedDictionary(Of String, RuleCompiledExpression),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
-                              answers As List(Of AnalysisRange)) As Boolean Implements ICompiledExpression.Match
+                              answers As List(Of AnalysisRange),
+                              debugMode As Boolean,
+                              messages As DebugMessage) As Boolean Implements ICompiledExpression.Match
             Dim startPos = tr.MemoryPosition()
             Dim snap = tr.MemoryPosition()
 
             Select Case Me._subExprs.Length
                 Case 1
-                    If Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers) Then
+                    If Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers, debugMode, messages) Then
                         Return True
                     Else
                         snap.Restore()
@@ -58,12 +62,12 @@ Namespace Parser
                     Dim subAnswer As New List(Of AnalysisRange)()
                     Select Case Me._subExprs(1).ToString()
                         Case "?"c
-                            Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer)
+                            Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages)
                             answers.AddRange(subAnswer)
                             Return True
 
                         Case "*"c
-                            Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer)
+                            Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages)
                                 ' 空実装
                             Loop
                             answers.AddRange(subAnswer)
@@ -71,7 +75,7 @@ Namespace Parser
 
                         Case "+"c
                             Dim hit As Boolean
-                            Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer)
+                            Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages)
                                 hit = True
                             Loop
                             If hit Then
@@ -83,10 +87,10 @@ Namespace Parser
                             End If
 
                         Case "-"c
-                            If Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer) Then
+                            If Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages) Then
                                 Dim snap2 = tr.MemoryPosition()
                                 snap.Restore()
-                                If Not Me._subExprs(2).Match(tr, ruleTable, specialMethods, New List(Of AnalysisRange)()) Then
+                                If Not Me._subExprs(2).Match(tr, ruleTable, specialMethods, New List(Of AnalysisRange)(), debugMode, messages) Then
                                     snap2.Restore()
                                     answers.AddRange(subAnswer)
                                     Return True

@@ -110,7 +110,7 @@ lhs = identifier ;
 rule = lhs , S , ""="" , S , rhs , S , terminator ;
 
 grammar = ( S , rule , S ) * ;"
-        Dim answer = SyntaxAnalysis.LexicalAnalysis(input, "grammar", input)
+        Dim answer = SyntaxAnalysis.CompileToEvaluate(input, "grammar", input)
     End Sub
 
     <Fact>
@@ -120,7 +120,7 @@ grammar = ( S , rule , S ) * ;"
 add_or_sub = digit, { S, ('+' | '-'), S, digit };
 S = { ' ' } ;
 grammar = add_or_sub;"
-        Dim answer = SyntaxAnalysis.LexicalAnalysis(
+        Dim answer = SyntaxAnalysis.CompileToEvaluate(
             input,
             Sub(env)
                 env.Add(
@@ -145,34 +145,34 @@ grammar = add_or_sub;"
     <Fact>
     Public Sub NumberTest1()
         Dim input = "number = ? Number ?;"
-        Dim env = SyntaxAnalysis.LexicalAnalysis(input, "number", "+1.0")
+        Dim env = SyntaxAnalysis.CompileToEvaluate(input, "number", "+1.0")
         Assert.Equal("+1.0", env.Answer.ToString())
-        Dim ans2 = env.LexicalAnalysis("number", "3.1415")
+        Dim ans2 = env.Evaluate("number", "3.1415")
         Assert.Equal("3.1415", ans2.ToString())
-        Dim ans3 = env.LexicalAnalysis("number", "-0.01")
+        Dim ans3 = env.Evaluate("number", "-0.01")
         Assert.Equal("-0.01", ans3.ToString())
-        Dim ans4 = env.LexicalAnalysis("number", "5e+22")
+        Dim ans4 = env.Evaluate("number", "5e+22")
         Assert.Equal("5e+22", ans4.ToString())
-        Dim ans5 = env.LexicalAnalysis("number", "1e06")
+        Dim ans5 = env.Evaluate("number", "1e06")
         Assert.Equal("1e06", ans5.ToString())
-        Dim ans6 = env.LexicalAnalysis("number", "-2E-2")
+        Dim ans6 = env.Evaluate("number", "-2E-2")
         Assert.Equal("-2E-2", ans6.ToString())
-        Dim ans7 = env.LexicalAnalysis("number", "6.626e-34")
+        Dim ans7 = env.Evaluate("number", "6.626e-34")
         Assert.Equal("6.626e-34", ans7.ToString())
 
         Assert.Throws(Of ArgumentException)(
             Sub()
-                env.LexicalAnalysis("number", ".7")
+                env.Evaluate("number", ".7")
             End Sub
         )
         Assert.Throws(Of ArgumentException)(
             Sub()
-                env.LexicalAnalysis("number", "7.")
+                env.Evaluate("number", "7.")
             End Sub
         )
         Assert.Throws(Of ArgumentException)(
             Sub()
-                env.LexicalAnalysis("number", "3.e+20")
+                env.Evaluate("number", "3.e+20")
             End Sub
         )
     End Sub
@@ -188,7 +188,7 @@ add_or_sub = multi_or_div, {S, ('+' | '-'), S, multi_or_div};
 S = {? Space ?};
 grammar = add_or_sub;"
 
-        Dim analysised1 = SyntaxAnalysis.LexicalAnalysis(input, "grammar", "1 + 2 * (3 - 4 + 5)")
+        Dim analysised1 = SyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
         Dim answer1 = ExpressionEvaluate.Run(Of Integer)(analysised1, AddressOf Evaluate2)
         Assert.Equal(9, answer1)
     End Sub
@@ -238,6 +238,49 @@ grammar = add_or_sub;"
                 Next
                 Return New EvaluateAnswer(expr, mdans)
 
+            Case "grammar"
+                Return New EvaluateAnswer(expr, filtered(0).Value)
+
+            Case Else
+                Throw New InvalidOperationException($"未知の識別子: {expr.Identifier}")
+        End Select
+    End Function
+
+    <Fact>
+    Public Sub StringTest()
+        Dim input = "" &
+"S = {? Space ?};
+quo_blk = ""'"", (? AllChar ? - ""'"")+, ""'"";
+add_or_sub = quo_blk, {S, '+', S, quo_blk};
+grammar = add_or_sub;"
+
+        Dim analysised1 = SyntaxAnalysis.CompileToEvaluate(input, "grammar", "'あいう' + 'えお'")
+        Dim answer1 = ExpressionEvaluate.Run(Of String)(analysised1, AddressOf Evaluate3)
+        Assert.Equal("あいうえお", answer1)
+    End Sub
+
+    Private Function Evaluate3(expr As AnalysisRange, values As IEnumerable(Of EvaluateAnswer)) As EvaluateAnswer
+        Dim filtered = values.Where(Function(v) v.Range IsNot Nothing AndAlso v.Range.Identifier <> "S").ToList()
+
+        Select Case expr.Identifier
+            Case "AllChar", "Space", "S"
+                ' 評価しない
+                Return Nothing
+            Case "quo_blk"
+                Return New EvaluateAnswer(expr, expr.ToString().Trim("'"c))
+            Case "literal"
+                Return New EvaluateAnswer(expr, expr.ToString())
+            Case "add_or_sub"
+                Dim asans = filtered(0).Value.ToString()
+                For i As Integer = 1 To filtered.Count - 1 Step 2
+                    Dim op = filtered(i).Value.ToString()
+                    Dim right = filtered(i + 1).Value.ToString()
+                    Select Case op
+                        Case "+"
+                            asans &= right
+                    End Select
+                Next
+                Return New EvaluateAnswer(expr, asans)
             Case "grammar"
                 Return New EvaluateAnswer(expr, filtered(0).Value)
 

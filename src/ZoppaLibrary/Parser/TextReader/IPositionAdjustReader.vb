@@ -42,6 +42,13 @@ Namespace Parser
         Function ReadChar() As Char?
 
         ''' <summary>
+        ''' 指定位置から読み込み済みの部分文字列を取得します。
+        ''' </summary>
+        ''' <param name="startIndex">開始位置。</param>
+        ''' <returns>取得した部分文字列。</returns>
+        Function Substring(startIndex As Integer) As String
+
+        ''' <summary>
         ''' 指定位置から指定長さの部分文字列を取得します。
         ''' </summary>
         ''' <param name="startIndex">開始位置。</param>

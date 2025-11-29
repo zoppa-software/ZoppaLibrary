@@ -101,6 +101,15 @@ Namespace Parser
         End Function
 
         ''' <summary>
+        ''' 指定位置から読み込み済みの部分文字列を取得します。
+        ''' </summary>
+        ''' <param name="startIndex">開始位置。</param>
+        ''' <returns>取得した部分文字列。</returns>
+        Public Function Substring(startIndex As Integer) As String Implements IPositionAdjustReader.Substring
+            Return Me._source.Substring(startIndex, Me._position - startIndex)
+        End Function
+
+        ''' <summary>
         ''' 指定位置から指定長さの部分文字列を取得します。
         ''' </summary>
         ''' <param name="startIndex">開始位置。</param>

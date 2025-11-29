@@ -42,16 +42,23 @@ Namespace Parser
         ''' <param name="ruleTable">ルールテーブル。</param>
         ''' <param name="specialMethods">特殊メソッドのテーブル。</param>
         ''' <param name="answers">解析結果を格納する範囲のリスト。</param>
+        ''' <param name="debugMode">デバッグモード。</param>
+        ''' <param name="messages">返却メッセージリスト。</param>
         ''' <returns>マッチした場合は true。それ以外は false。</returns>
         Public Function Match(tr As IPositionAdjustReader,
                               ruleTable As SortedDictionary(Of String, RuleCompiledExpression),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
-                              answers As List(Of AnalysisRange)) As Boolean Implements ICompiledExpression.Match
+                              answers As List(Of AnalysisRange),
+                              debugMode As Boolean,
+                              messages As DebugMessage) As Boolean Implements ICompiledExpression.Match
             Dim startPos = tr.Position
             Dim snap = tr.MemoryPosition()
 
             Dim rcnt = tr.Read(Me._readbuffer, 0, Me._stringValue.Length)
             If EqualString(Me._readbuffer, rcnt, Me._stringValue) Then
+                If debugMode Then
+                    messages.Add($"一致:{Me._stringValue}")
+                End If
                 answers.Add(New AnalysisRange("literal", New List(Of AnalysisRange)(), tr, startPos, tr.Position))
                 Return True
             Else

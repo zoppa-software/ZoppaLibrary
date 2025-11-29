@@ -43,30 +43,43 @@ Namespace Parser
         ''' <param name="ruleTable">ルールテーブル。</param>
         ''' <param name="specialMethods">特殊メソッドのテーブル。</param>
         ''' <param name="answers">解析結果を格納する範囲のリスト。</param>
+        ''' <param name="debugMode">デバッグモード。</param>
+        ''' <param name="messages">返却メッセージリスト。</param>
         ''' <returns>マッチした場合は true。それ以外は false。</returns>
         Public Function Match(tr As IPositionAdjustReader,
                               ruleTable As SortedDictionary(Of String, RuleCompiledExpression),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
-                              answers As List(Of AnalysisRange)) As Boolean Implements ICompiledExpression.Match
+                              answers As List(Of AnalysisRange),
+                              debugMode As Boolean,
+                              messages As DebugMessage) As Boolean Implements ICompiledExpression.Match
             Dim startPos = tr.MemoryPosition()
             Dim snap = tr.MemoryPosition()
 
             Select Case Me._pattern
                 Case "["c
                     ' オプションパターン
-                    Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers)
+                    Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers, debugMode, messages)
+                    If debugMode Then
+                        messages.Add("オプション 0 か 1回 [] : {}")
+                    End If
                     Return True
 
                 Case "{"c
                     ' オプションパターン
-                    Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers)
-                        ' 空実装
+                    If debugMode Then
+                        messages.Add("オプション 0回以上 {}")
+                    End If
+                    Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers, debugMode, messages)
+                        ' 何もしない
                     Loop
                     Return True
 
                 Case Else
                     ' グループパターン
-                    If Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers) Then
+                    If debugMode Then
+                        messages.Add("グループ")
+                    End If
+                    If Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers, debugMode, messages) Then
                         Return True
                     Else
                         snap.Restore()

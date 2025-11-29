@@ -37,11 +37,15 @@ Namespace Parser
         ''' <param name="ruleTable">ルールテーブル。</param>
         ''' <param name="specialMethods">特殊メソッドのテーブル。</param>
         ''' <param name="answers">解析結果を格納する範囲のリスト。</param>
+        ''' <param name="debugMode">デバッグモード。</param>
+        ''' <param name="messages">返却メッセージリスト。</param>
         ''' <returns>マッチした場合は true。それ以外は false。</returns>
         Public Function Match(tr As IPositionAdjustReader,
                               ruleTable As SortedDictionary(Of String, RuleCompiledExpression),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
-                              answers As List(Of AnalysisRange)) As Boolean Implements ICompiledExpression.Match
+                              answers As List(Of AnalysisRange),
+                              debugMode As Boolean,
+                              messages As DebugMessage) As Boolean Implements ICompiledExpression.Match
             Dim snap = tr.MemoryPosition()
             Dim subAnswers As New List(Of AnalysisRange)()
 
@@ -49,8 +53,11 @@ Namespace Parser
                 snap.Restore()
                 subAnswers.Clear()
 
-                If subExpr.Match(tr, ruleTable, specialMethods, subAnswers) Then
+                If subExpr.Match(tr, ruleTable, specialMethods, subAnswers, debugMode, messages) Then
                     ' マッチした場合は真を返す
+                    If debugMode Then
+                        messages.Add($"選択:{subExpr.ToString()}")
+                    End If
                     answers.AddRange(subAnswers)
                     Return True
                 End If

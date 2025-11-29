@@ -17,27 +17,30 @@ Namespace Parser
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
-        Public Function LexicalAnalysis(rules As IPositionAdjustReader,
-                                        addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
-                                        ident As String,
-                                        target As IPositionAdjustReader) As AnalysisEnvironment
+        Public Function CompileToEvaluate(rules As IPositionAdjustReader,
+                                          addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
+                                          ident As String,
+                                          target As IPositionAdjustReader,
+                                          Optional debugMode As Boolean = False) As AnalysisEnvironment
             '  メソッドテーブルを作成
-            Dim answerEnv = CreateRuleTable(rules, addSpecMethods)
+            Dim answerEnv = CompileEnvironment(rules, addSpecMethods, debugMode)
 
             ' 解析を実行
             If answerEnv.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
                 Dim answers As New List(Of AnalysisRange)()
-                If answerEnv.RuleTable(ident).Pattern.Match(target, answerEnv.RuleTable, answerEnv.MethodTable, answers) Then
+                Dim message As New DebugMessage(target)
+                If answerEnv.RuleTable(ident).Pattern.Match(target, answerEnv.RuleTable, answerEnv.MethodTable, answers, debugMode, message) Then
                     If target.Peek() = -1 Then
                         ' 解析成功
                         answerEnv.Answer = New AnalysisRange(ident, answers, target, startPos, target.Position)
                         Return answerEnv
                     End If
                 End If
-                Throw New ArgumentException($"識別子 '{ident}' の解析に失敗しました。...{target.ToLastString(50)}")
+                Throw New ArgumentException($"識別子 '{ident}' の解析に失敗しました。...{message.GetUnmatchedMessage()}")
             End If
             Throw New ArgumentException($"指定された識別子 '{ident}' はルールに存在しません。", ident)
         End Function
@@ -48,27 +51,32 @@ Namespace Parser
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
-        Public Function LexicalAnalysis(rules As IPositionAdjustReader,
-                                        ident As String,
-                                        target As IPositionAdjustReader) As AnalysisEnvironment
-            Return LexicalAnalysis(rules, Nothing, ident, target)
+        Public Function CompileToEvaluate(rules As IPositionAdjustReader,
+                                          ident As String,
+                                          target As IPositionAdjustReader,
+                                          Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileToEvaluate(rules, Nothing, ident, target, debugMode)
         End Function
 
         ''' <summary>
         ''' 指定されたルール群と識別子、解析対象に基づいて構文解析を実行します。
         ''' </summary>
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す文字列。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
-        Public Function LexicalAnalysis(rules As String,
-                                        addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
-                                        ident As String,
-                                        target As IPositionAdjustReader) As AnalysisEnvironment
-            Return LexicalAnalysis(New PositionAdjustStringReader(rules), addSpecMethods, ident, target)
+        Public Function CompileToEvaluate(rules As String,
+                                          addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
+                                          ident As String,
+                                          target As IPositionAdjustReader,
+                                          Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, target, debugMode)
         End Function
 
         ''' <summary>
@@ -77,12 +85,32 @@ Namespace Parser
         ''' <param name="rules">ルール群を表す文字列。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
-        Public Function LexicalAnalysis(rules As String,
-                                        ident As String,
-                                        target As IPositionAdjustReader) As AnalysisEnvironment
-            Return LexicalAnalysis(New PositionAdjustStringReader(rules), Nothing, ident, target)
+        Public Function CompileToEvaluate(rules As String,
+                                          ident As String,
+                                          target As IPositionAdjustReader,
+                                          Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, target, debugMode)
+        End Function
+
+        ''' <summary>
+        ''' 指定されたルール群と識別子、解析対象に基づいて構文解析を実行します。
+        ''' </summary>
+        ''' <param name="rules">ルール群を表す文字列。</param>
+        ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
+        ''' <param name="ident">解析を開始する識別子。</param>
+        ''' <param name="target">解析対象を表す文字列。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
+        ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
+        ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
+        Public Function CompileToEvaluate(rules As String,
+                                          addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
+                                          ident As String,
+                                          target As String,
+                                          Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, New PositionAdjustStringReader(target), debugMode)
         End Function
 
         ''' <summary>
@@ -91,27 +119,14 @@ Namespace Parser
         ''' <param name="rules">ルール群を表す文字列。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す文字列。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
-        Public Function LexicalAnalysis(rules As String,
-                                        addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
-                                        ident As String,
-                                        target As String) As AnalysisEnvironment
-            Return LexicalAnalysis(New PositionAdjustStringReader(rules), addSpecMethods, ident, New PositionAdjustStringReader(target))
-        End Function
-
-        ''' <summary>
-        ''' 指定されたルール群と識別子、解析対象に基づいて構文解析を実行します。
-        ''' </summary>
-        ''' <param name="rules">ルール群を表す文字列。</param>
-        ''' <param name="ident">解析を開始する識別子。</param>
-        ''' <param name="target">解析対象を表す文字列。</param>
-        ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
-        ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
-        Public Function LexicalAnalysis(rules As String,
-                                        ident As String,
-                                        target As String) As AnalysisEnvironment
-            Return LexicalAnalysis(New PositionAdjustStringReader(rules), Nothing, ident, New PositionAdjustStringReader(target))
+        Public Function CompileToEvaluate(rules As String,
+                                          ident As String,
+                                          target As String,
+                                          Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, New PositionAdjustStringReader(target), debugMode)
         End Function
 
         ''' <summary>
@@ -119,11 +134,13 @@ Namespace Parser
         ''' </summary>
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="AnalysisEnvironment"/>。</returns>
-        Public Function CreateRuleTable(rules As IPositionAdjustReader,
-                                        addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)))) As AnalysisEnvironment
+        Public Function CompileEnvironment(rules As IPositionAdjustReader,
+                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
+                                           Optional debugMode As Boolean = False) As AnalysisEnvironment
             '  メソッドテーブルを作成
-            Dim answerEnv As New AnalysisEnvironment()
+            Dim answerEnv As New AnalysisEnvironment(debugMode)
             If addSpecMethods IsNot Nothing Then
                 addSpecMethods(answerEnv.MethodTable)
             End If
@@ -141,9 +158,10 @@ Namespace Parser
         ''' 指定されたルール群に基づいてルールテーブルを作成します。
         ''' </summary>
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="AnalysisEnvironment"/>。</returns>
-        Public Function CreateRuleTable(rules As IPositionAdjustReader) As AnalysisEnvironment
-            Return CreateRuleTable(rules, Nothing)
+        Public Function CompileEnvironment(rules As IPositionAdjustReader, Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileEnvironment(rules, Nothing, debugMode)
         End Function
 
         ''' <summary>
@@ -151,19 +169,22 @@ Namespace Parser
         ''' </summary>
         ''' <param name="rules">ルール群を表す文字列。</param>
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="AnalysisEnvironment"/>。</returns>
-        Public Function CreateRuleTable(rules As String,
-                                        addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)))) As AnalysisEnvironment
-            Return CreateRuleTable(New PositionAdjustStringReader(rules), addSpecMethods)
+        Public Function CompileEnvironment(rules As String,
+                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
+                                           Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileEnvironment(New PositionAdjustStringReader(rules), addSpecMethods, debugMode)
         End Function
 
         ''' <summary>
         ''' 指定されたルール群に基づいてルールテーブルを作成します。
         ''' </summary>
         ''' <param name="rules">ルール群を表す文字列。</param>
+        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="AnalysisEnvironment"/>。</returns>
-        Public Function CreateRuleTable(rules As String) As AnalysisEnvironment
-            Return CreateRuleTable(New PositionAdjustStringReader(rules), Nothing)
+        Public Function CompileEnvironment(rules As String, Optional debugMode As Boolean = False) As AnalysisEnvironment
+            Return CompileEnvironment(New PositionAdjustStringReader(rules), Nothing, debugMode)
         End Function
 
         ''' <summary>
@@ -191,18 +212,19 @@ Namespace Parser
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         <Extension()>
-        Public Function LexicalAnalysis(env As AnalysisEnvironment, ident As String, target As IPositionAdjustReader) As AnalysisRange
+        Public Function Evaluate(env As AnalysisEnvironment, ident As String, target As IPositionAdjustReader) As AnalysisRange
             If env.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
                 Dim answers As New List(Of AnalysisRange)()
-                If env.RuleTable(ident).Pattern.Match(target, env.RuleTable, env.MethodTable, answers) Then
+                Dim message As New DebugMessage(target)
+                If env.RuleTable(ident).Pattern.Match(target, env.RuleTable, env.MethodTable, answers, env.DebugMode, message) Then
                     If target.Peek() = -1 Then
                         ' 解析成功
                         env.Answer = New AnalysisRange(ident, answers, target, startPos, target.Position)
                         Return env.Answer
                     End If
                 End If
-                Throw New ArgumentException($"識別子 '{ident}' の解析に失敗しました。...{target.ToLastString(50)}")
+                Throw New ArgumentException($"識別子 '{ident}' の解析に失敗しました。...{message.GetUnmatchedMessage()}")
             End If
             Throw New ArgumentException($"指定された識別子 '{ident}' はルールに存在しません。", ident)
         End Function
@@ -216,14 +238,22 @@ Namespace Parser
         ''' <returns>解析結果を表す <see cref="AnalysisEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         <Extension()>
-        Public Function LexicalAnalysis(env As AnalysisEnvironment, ident As String, target As String) As AnalysisRange
-            Return LexicalAnalysis(env, ident, New PositionAdjustStringReader(target))
+        Public Function Evaluate(env As AnalysisEnvironment, ident As String, target As String) As AnalysisRange
+            Return Evaluate(env, ident, New PositionAdjustStringReader(target))
         End Function
 
 #Region "特殊メソッド"
 
+        ''' <summary>
+        ''' 空白文字を表す特殊メソッド名を取得します。
+        ''' </summary>
         Public ReadOnly Property SpaceMethodName As String = NameOf(Space)
 
+        ''' <summary>
+        ''' 空白文字を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
         Private Function Space(tr As IPositionAdjustReader) As Boolean
             Dim startPos = tr.Position
             Dim readAny = False
@@ -234,8 +264,31 @@ Namespace Parser
             Return readAny
         End Function
 
+        ''' <summary>
+        ''' 全ての文字を表す特殊メソッド名を取得します。
+        ''' </summary>
+        Public ReadOnly Property AllCharMethodName As String = NameOf(AllChar)
+
+        ''' <summary>
+        ''' 全ての文字を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
+        Private Function AllChar(tr As IPositionAdjustReader) As Boolean
+            Dim c = tr.Read()
+            Return (c > 0)
+        End Function
+
+        ''' <summary>
+        ''' 英字を表す特殊メソッド名を取得します。
+        ''' </summary>
         Public ReadOnly Property AlphaMethodName As String = NameOf(Alpha)
 
+        ''' <summary>
+        ''' 英字を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
         Private Function Alpha(tr As IPositionAdjustReader) As Boolean
             Dim startPos = tr.Position
             Dim readAny = False
@@ -247,8 +300,36 @@ Namespace Parser
             Return readAny
         End Function
 
+        ''' <summary>
+        ''' ASCII文字を表す特殊メソッド名を取得します。
+        ''' </summary>
+        Public ReadOnly Property AsciiCharMethodName As String = NameOf(AsciiChar)
+
+        ''' <summary>
+        ''' ASCII文字を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns> 
+        Private Function AsciiChar(tr As IPositionAdjustReader) As Boolean
+            Dim startPos = tr.Position
+            Dim readAny = False
+            While tr.Peek() >= 32 AndAlso tr.Peek() <= 126
+                tr.Read()
+                readAny = True
+            End While
+            Return readAny
+        End Function
+
+        ''' <summary>
+        ''' 数字を表す特殊メソッド名を取得します。
+        ''' </summary>
         Public ReadOnly Property DigitMethodName As String = NameOf(Digit)
 
+        ''' <summary>
+        ''' 数字を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
         Private Function Digit(tr As IPositionAdjustReader) As Boolean
             Dim startPos = tr.Position
             Dim readAny = False
@@ -259,9 +340,14 @@ Namespace Parser
             Return readAny
         End Function
 
-        Public ReadOnly Property HexdigMethodName As String = NameOf(Hexdig)
+        Public ReadOnly Property HexingMethodName As String = NameOf(Hexing)
 
-        Private Function Hexdig(tr As IPositionAdjustReader) As Boolean
+        ''' <summary>
+        ''' 16進数を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
+        Private Function Hexing(tr As IPositionAdjustReader) As Boolean
             Dim startPos = tr.Position
             Dim readAny = False
             While Char.IsDigit(ChrW(tr.Peek())) OrElse
@@ -273,6 +359,9 @@ Namespace Parser
             Return readAny
         End Function
 
+        ''' <summary>
+        ''' 整数を表す特殊メソッド名を取得します。
+        ''' </summary>
         Public ReadOnly Property IntegerMethodName As String = NameOf([Integer])
 
         ''' <summary>
@@ -333,8 +422,16 @@ Namespace Parser
             End If
         End Function
 
+        ''' <summary>
+        ''' 数値を表す特殊メソッド名を取得します。
+        ''' </summary>
         Public ReadOnly Property NumberMethodName As String = NameOf(Number)
 
+        ''' <summary>
+        ''' 数値を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
         Private Function Number(tr As IPositionAdjustReader) As Boolean
             Dim startPos = tr.Position
 
@@ -352,7 +449,7 @@ Namespace Parser
                 ' 数字
                 Dim num = tr.Peek()
                 If num >= AscW("0"c) AndAlso num <= AscW("9"c) Then
-                    ReadSeqDidit(tr)
+                    ReadSeqDigits(tr)
                 Else
                     snap.Restore()
                 End If
@@ -373,7 +470,7 @@ Namespace Parser
                 ' 数字
                 Dim num = tr.Peek()
                 If num >= AscW("0"c) AndAlso num <= AscW("9"c) Then
-                    ReadSeqDidit(tr)
+                    ReadSeqDigits(tr)
                 Else
                     snap2.Restore()
                 End If
@@ -382,7 +479,13 @@ Namespace Parser
             Return True
         End Function
 
-        Private Sub ReadSeqDidit(tr As IPositionAdjustReader)
+        ''' <summary>
+        ''' 連続する数字列を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。
+        ''' </summary>
+        ''' <param name="tr"></param>
+        Private Sub ReadSeqDigits(tr As IPositionAdjustReader)
             tr.Read()
             Do While True
                 ' _ チェック
@@ -409,14 +512,19 @@ Namespace Parser
         Public NotInheritable Class AnalysisEnvironment
 
             ''' <summary>
-            ''' 特殊メソッドテーブル
+            ''' 特殊メソッドテーブル。
             ''' </summary>
             Public ReadOnly Property MethodTable As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))
 
             ''' <summary>
-            ''' ルールテーブル
+            ''' ルールテーブル。
             ''' </summary>
             Public ReadOnly Property RuleTable As SortedDictionary(Of String, RuleCompiledExpression)
+
+            ''' <summary>
+            ''' デバッグモードで動作するかどうかを示す値。
+            ''' </summary>
+            Public ReadOnly Property DebugMode As Boolean
 
             ''' <summary>
             ''' 解析結果
@@ -426,11 +534,14 @@ Namespace Parser
             ''' <summary>
             ''' コンストラクター
             ''' </summary>
-            Public Sub New()
+            ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
+            Public Sub New(debugMode As Boolean)
                 Me.MethodTable = New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
                 Me.InnerClearSpecialMethods()
 
                 Me.RuleTable = New SortedDictionary(Of String, RuleCompiledExpression)()
+
+                Me.DebugMode = debugMode
             End Sub
 
             ''' <summary>
@@ -440,9 +551,10 @@ Namespace Parser
                 Me.MethodTable.Clear()
 
                 ' 標準メソッドを追加
+                Me.MethodTable.Add(AllCharMethodName, AddressOf AllChar)
                 Me.MethodTable.Add(AlphaMethodName, AddressOf Alpha)
                 Me.MethodTable.Add(DigitMethodName, AddressOf Digit)
-                Me.MethodTable.Add(HexdigMethodName, AddressOf Hexdig)
+                Me.MethodTable.Add(HexingMethodName, AddressOf Hexing)
                 Me.MethodTable.Add(IntegerMethodName, AddressOf [Integer])
                 Me.MethodTable.Add(NumberMethodName, AddressOf Number)
                 Me.MethodTable.Add(SpaceMethodName, AddressOf Space)
@@ -461,6 +573,32 @@ Namespace Parser
                     Me.MethodTable.Add(name, method)
                 End If
             End Sub
+
+        End Class
+
+        Public NotInheritable Class DebugMessage
+
+            Private ReadOnly _tar As IPositionAdjustReader
+
+            Private ReadOnly _msgs As New List(Of String)
+
+            Private _unmatched As String = ""
+
+            Public Sub New(target As IPositionAdjustReader)
+                _tar = target
+            End Sub
+
+            Public Sub Add(msg As String)
+                _msgs.Add(msg)
+            End Sub
+
+            Public Sub AddUnmatched(msg As String)
+                _unmatched = msg
+            End Sub
+
+            Public Function GetUnmatchedMessage() As String
+                Return If(_unmatched <> "", _unmatched, _tar.Substring(_tar.Position))
+            End Function
 
         End Class
 
