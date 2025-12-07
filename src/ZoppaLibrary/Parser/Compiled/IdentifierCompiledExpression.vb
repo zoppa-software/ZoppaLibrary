@@ -55,7 +55,7 @@ Namespace Parser
                     answers.Add(New AnalysisRange(Me._name, subAnswers, tr, startPos, tr.Position))
                     Return True
                 Else
-                    messages.AddUnmatched($"ルール:'{Me._name}'が一致しません。位置:{currPos} '{tr.Substring(currPos)}'")
+                    messages.SetUnmatched($"ルール:'{Me._name}'が一致しません。位置:{currPos} '{tr.Substring(currPos)}'")
                     snap.Restore()
                     Return False
                 End If

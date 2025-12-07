@@ -49,14 +49,16 @@ Namespace Parser
             Dim snap = tr.MemoryPosition()
             Dim subAnswers As New List(Of AnalysisRange)()
 
+            ' 連結要素を順番にマッチさせる
             For Each subExpr In Me._subExprs
+                ' マッチしなかった場合は元の位置に戻す
                 If Not subExpr.Match(tr, ruleTable, specialMethods, subAnswers, debugMode, messages) Then
-                    ' マッチしなかった場合は元の位置に戻す
                     snap.Restore()
                     Return False
                 End If
             Next
 
+            ' 全ての要素がマッチした場合は結果を追加する
             answers.AddRange(subAnswers)
             Return True
         End Function

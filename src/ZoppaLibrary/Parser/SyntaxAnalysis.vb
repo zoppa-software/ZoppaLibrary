@@ -576,26 +576,54 @@ Namespace Parser
 
         End Class
 
+        ''' <summary>
+        ''' デバッグメッセージを保持するクラス。
+        ''' </summary>
         Public NotInheritable Class DebugMessage
 
+            ''' <summary>
+            ''' 文字参照インターフェース。
+            ''' </summary>
             Private ReadOnly _tar As IPositionAdjustReader
 
+            ''' <summary>
+            ''' メッセージリスト。
+            ''' </summary>
             Private ReadOnly _msgs As New List(Of String)
 
+            ''' <summary>
+            ''' 不一致メッセージ。
+            ''' </summary>
             Private _unmatched As String = ""
 
+            ''' <summary>
+            ''' コンストラクタ。
+            ''' </summary>
+            ''' <param name="target">文字参照。</param>
             Public Sub New(target As IPositionAdjustReader)
                 _tar = target
             End Sub
 
+            ''' <summary>
+            ''' メッセージを追加する。
+            ''' </summary>
+            ''' <param name="msg">メッセージ。</param>
             Public Sub Add(msg As String)
                 _msgs.Add(msg)
             End Sub
 
-            Public Sub AddUnmatched(msg As String)
+            ''' <summary>
+            ''' 不一致メッセージを設定する。
+            ''' </summary>
+            ''' <param name="msg">不一致メッセージ。</param>
+            Public Sub SetUnmatched(msg As String)
                 _unmatched = msg
             End Sub
 
+            ''' <summary>
+            ''' 不一致メッセージを取得する。
+            ''' </summary>
+            ''' <returns>不一致メッセージ。</returns>
             Public Function GetUnmatchedMessage() As String
                 Return If(_unmatched <> "", _unmatched, _tar.Substring(_tar.Position))
             End Function

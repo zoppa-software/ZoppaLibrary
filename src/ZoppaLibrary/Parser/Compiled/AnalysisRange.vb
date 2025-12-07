@@ -62,6 +62,10 @@ Namespace Parser
             Me.End = endPos
         End Sub
 
+        ''' <summary>
+        ''' この範囲の文字列を取得します。
+        ''' </summary>
+        ''' <returns>範囲の文字列。</returns>
         Public Overrides Function ToString() As String
             Return $"{Me._tr.Substring(Me.Start, Me.End - Me.Start)}"
         End Function

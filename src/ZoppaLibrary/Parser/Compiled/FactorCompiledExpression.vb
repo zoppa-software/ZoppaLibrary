@@ -51,6 +51,7 @@ Namespace Parser
 
             Select Case Me._subExprs.Length
                 Case 1
+                    ' 繰り返し記号なし
                     If Me._subExprs(0).Match(tr, ruleTable, specialMethods, answers, debugMode, messages) Then
                         Return True
                     Else
@@ -62,11 +63,13 @@ Namespace Parser
                     Dim subAnswer As New List(Of AnalysisRange)()
                     Select Case Me._subExprs(1).ToString()
                         Case "?"c
+                            ' オプション(0 or 1)
                             Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages)
                             answers.AddRange(subAnswer)
                             Return True
 
                         Case "*"c
+                            ' 0回以上の繰り返し
                             Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages)
                                 ' 空実装
                             Loop
@@ -74,6 +77,7 @@ Namespace Parser
                             Return True
 
                         Case "+"c
+                            ' 1回以上の繰り返し
                             Dim hit As Boolean
                             Do While Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages)
                                 hit = True
@@ -87,6 +91,8 @@ Namespace Parser
                             End If
 
                         Case "-"c
+                            ' それ以外の判定
+                            ' つまり、最初の式にマッチして、かつ以外で指定した式にマッチしない場合に成功
                             If Me._subExprs(0).Match(tr, ruleTable, specialMethods, subAnswer, debugMode, messages) Then
                                 Dim snap2 = tr.MemoryPosition()
                                 snap.Restore()

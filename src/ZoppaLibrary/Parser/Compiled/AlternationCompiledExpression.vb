@@ -49,6 +49,7 @@ Namespace Parser
             Dim snap = tr.MemoryPosition()
             Dim subAnswers As New List(Of AnalysisRange)()
 
+            ' それぞれの選択肢を試す
             For Each subExpr In Me._subExprs
                 snap.Restore()
                 subAnswers.Clear()
@@ -63,6 +64,7 @@ Namespace Parser
                 End If
             Next
 
+            ' どれもマッチしなかった場合は偽を返す
             snap.Restore()
             Return False
         End Function
