@@ -1,7 +1,7 @@
 Option Explicit On
 Option Strict On
 
-Imports ZoppaLibrary.Parser
+Imports ZoppaLibrary.EBNF
 Imports Xunit
 
 Public Class TermExpressionTests

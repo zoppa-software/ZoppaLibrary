@@ -3,7 +3,7 @@ Option Strict On
 
 Imports System.Net
 Imports Xunit
-Imports ZoppaLibrary.Parser
+Imports ZoppaLibrary.EBNF
 
 Public Class GrammarExpressionTests
 
@@ -110,7 +110,7 @@ lhs = identifier ;
 rule = lhs , S , ""="" , S , rhs , S , terminator ;
 
 grammar = ( S , rule , S ) * ;"
-        Dim answer = SyntaxAnalysis.CompileToEvaluate(input, "grammar", input)
+        Dim answer = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", input)
     End Sub
 
     <Fact>
@@ -120,7 +120,7 @@ grammar = ( S , rule , S ) * ;"
 add_or_sub = digit, { S, ('+' | '-'), S, digit };
 S = { ' ' } ;
 grammar = add_or_sub;"
-        Dim answer = SyntaxAnalysis.CompileToEvaluate(
+        Dim answer = EBNFSyntaxAnalysis.CompileToEvaluate(
             input,
             Sub(env)
                 env.Add(
@@ -145,7 +145,7 @@ grammar = add_or_sub;"
     <Fact>
     Public Sub NumberTest1()
         Dim input = "number = ? Number ?;"
-        Dim env = SyntaxAnalysis.CompileToEvaluate(input, "number", "+1.0")
+        Dim env = EBNFSyntaxAnalysis.CompileToEvaluate(input, "number", "+1.0")
         Assert.Equal("+1.0", env.Answer.ToString())
         Dim ans2 = env.Evaluate("number", "3.1415")
         Assert.Equal("3.1415", ans2.ToString())
@@ -188,12 +188,12 @@ add_or_sub = multi_or_div, {S, ('+' | '-'), S, multi_or_div};
 S = {? Space ?};
 grammar = add_or_sub;"
 
-        Dim analysised1 = SyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
-        Dim answer1 = ExpressionEvaluate.Run(Of Integer)(analysised1, AddressOf Evaluate2)
+        Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
+        Dim answer1 = EBNFEvaluate.Run(Of Integer)(analysised1, AddressOf Evaluate2)
         Assert.Equal(9, answer1)
     End Sub
 
-    Private Function Evaluate2(expr As AnalysisRange, values As IEnumerable(Of EvaluateAnswer)) As EvaluateAnswer
+    Private Function Evaluate2(expr As EBNFAnalysisItem, values As IEnumerable(Of EBNFEvaluateAnswer)) As EBNFEvaluateAnswer
         Dim filtered = values.Where(Function(v) v.Range IsNot Nothing AndAlso v.Range.Identifier <> "S").ToList()
 
         Select Case expr.Identifier
@@ -201,14 +201,14 @@ grammar = add_or_sub;"
                 ' 評価しない
                 Return Nothing
             Case "number"
-                Return New EvaluateAnswer(expr, Double.Parse(expr.SubRanges(0).ToString()))
+                Return New EBNFEvaluateAnswer(expr, Double.Parse(expr.SubRanges(0).ToString()))
             Case "backet"
-                Return New EvaluateAnswer(expr, filtered(1).Value)
+                Return New EBNFEvaluateAnswer(expr, filtered(1).Value)
             Case "term"
-                Return New EvaluateAnswer(expr, filtered(0).Value)
+                Return New EBNFEvaluateAnswer(expr, filtered(0).Value)
 
             Case "literal"
-                Return New EvaluateAnswer(expr, expr.ToString())
+                Return New EBNFEvaluateAnswer(expr, expr.ToString())
 
             Case "add_or_sub"
                 Dim asans = CDbl(filtered(0).Value)
@@ -222,7 +222,7 @@ grammar = add_or_sub;"
                             asans -= right
                     End Select
                 Next
-                Return New EvaluateAnswer(expr, asans)
+                Return New EBNFEvaluateAnswer(expr, asans)
 
             Case "multi_or_div"
                 Dim mdans = CDbl(filtered(0).Value)
@@ -236,10 +236,10 @@ grammar = add_or_sub;"
                             mdans /= right
                     End Select
                 Next
-                Return New EvaluateAnswer(expr, mdans)
+                Return New EBNFEvaluateAnswer(expr, mdans)
 
             Case "grammar"
-                Return New EvaluateAnswer(expr, filtered(0).Value)
+                Return New EBNFEvaluateAnswer(expr, filtered(0).Value)
 
             Case Else
                 Throw New InvalidOperationException($"未知の識別子: {expr.Identifier}")
@@ -254,12 +254,12 @@ quo_blk = ""'"", (? AllChar ? - ""'"")+, ""'"";
 add_or_sub = quo_blk, {S, '+', S, quo_blk};
 grammar = add_or_sub;"
 
-        Dim analysised1 = SyntaxAnalysis.CompileToEvaluate(input, "grammar", "'あいう' + 'えお'")
-        Dim answer1 = ExpressionEvaluate.Run(Of String)(analysised1, AddressOf Evaluate3)
+        Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "'あいう' + 'えお'")
+        Dim answer1 = EBNFEvaluate.Run(Of String)(analysised1, AddressOf Evaluate3)
         Assert.Equal("あいうえお", answer1)
     End Sub
 
-    Private Function Evaluate3(expr As AnalysisRange, values As IEnumerable(Of EvaluateAnswer)) As EvaluateAnswer
+    Private Function Evaluate3(expr As EBNFAnalysisItem, values As IEnumerable(Of EBNFEvaluateAnswer)) As EBNFEvaluateAnswer
         Dim filtered = values.Where(Function(v) v.Range IsNot Nothing AndAlso v.Range.Identifier <> "S").ToList()
 
         Select Case expr.Identifier
@@ -267,9 +267,9 @@ grammar = add_or_sub;"
                 ' 評価しない
                 Return Nothing
             Case "quo_blk"
-                Return New EvaluateAnswer(expr, expr.ToString().Trim("'"c))
+                Return New EBNFEvaluateAnswer(expr, expr.ToString().Trim("'"c))
             Case "literal"
-                Return New EvaluateAnswer(expr, expr.ToString())
+                Return New EBNFEvaluateAnswer(expr, expr.ToString())
             Case "add_or_sub"
                 Dim asans = filtered(0).Value.ToString()
                 For i As Integer = 1 To filtered.Count - 1 Step 2
@@ -280,9 +280,9 @@ grammar = add_or_sub;"
                             asans &= right
                     End Select
                 Next
-                Return New EvaluateAnswer(expr, asans)
+                Return New EBNFEvaluateAnswer(expr, asans)
             Case "grammar"
-                Return New EvaluateAnswer(expr, filtered(0).Value)
+                Return New EBNFEvaluateAnswer(expr, filtered(0).Value)
 
             Case Else
                 Throw New InvalidOperationException($"未知の識別子: {expr.Identifier}")

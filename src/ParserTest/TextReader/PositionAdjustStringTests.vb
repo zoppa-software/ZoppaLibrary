@@ -1,6 +1,6 @@
 ﻿Imports System
 Imports System.IO
-Imports ZoppaLibrary.Parser
+Imports ZoppaLibrary.EBNF
 Imports Xunit
 
 Public Class PositionAdjustStringTests
