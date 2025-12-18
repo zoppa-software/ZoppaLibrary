@@ -6,7 +6,7 @@ Imports System.Text
 Namespace EBNF
 
     ''' <summary>
-    ''' コメント式を表します。
+    ''' 特殊式を表します。
     ''' specialSeq = "?" , ( character | S ) * , "?" ;
     ''' </summary>
     NotInheritable Class SpecialSeqExpression
@@ -14,7 +14,7 @@ Namespace EBNF
 
         ''' <summary>
         ''' 指定された <see cref="IPositionAdjustReader"/> の現在位置にある文字が
-        ''' コメント式にマッチすればマッチした範囲を <see cref="ExpressionRange"/> として返します。
+        ''' 特殊式にマッチすればマッチした範囲を <see cref="ExpressionRange"/> として返します。
         ''' マッチしない場合は <see cref="ExpressionRange.Invalid"/> を返します。
         ''' </summary>
         ''' <param name="tr">入力ソースを表す <see cref="IPositionAdjustReader"/>。</param>

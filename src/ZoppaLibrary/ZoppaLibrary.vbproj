@@ -5,4 +5,10 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="EBNF\Compiled\AlternationCompiledExpression2.vb" />
+    <Compile Remove="EBNF\Compiled\IdentifierCompiledExpression.vb" />
+    <Compile Remove="EBNF\Compiled\SpecialSeqCompiledExpression.vb" />
+  </ItemGroup>
+
 </Project>

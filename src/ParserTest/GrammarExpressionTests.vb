@@ -289,4 +289,22 @@ grammar = add_or_sub;"
         End Select
     End Function
 
+    <Fact>
+    Public Sub NumberTest3()
+        Dim input = "" &
+"multi_or_div = term, {S, ('*' | '/'), S, term};
+number = ? Number ?;
+backet = '(' , S , add_or_sub , S , ')' ;
+term = number | backet ;
+add_or_sub = multi_or_div, {S, ('+' | '-'), S, multi_or_div};
+S = {? Space ?};
+grammar = add_or_sub;"
+
+        'Dim expr = New GrammarExpression()
+        'Dim range = expr.Match(New PositionAdjustStringReader(input))
+        'CreateRuleTable(range)
+
+        Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
+    End Sub
+
 End Class

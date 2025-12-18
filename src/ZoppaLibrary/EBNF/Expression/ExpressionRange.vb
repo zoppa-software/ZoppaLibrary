@@ -97,6 +97,21 @@ Namespace EBNF
         End Sub
 
         ''' <summary>
+        ''' 指定されたインデックスの文字を取得します。
+        ''' </summary>
+        ''' <param name="index">インデックス（0 ベース）。</param>
+        ''' <returns>指定されたインデックスの文字。</returns>
+        ''' <exception cref="ArgumentOutOfRangeException">
+        ''' index が範囲外の場合にスローされます。
+        ''' </exception>
+        Public Function SubChar(index As Integer) As Char
+            If index < 0 OrElse index >= Me.[End] - Me.[Start] Then
+                Throw New ArgumentOutOfRangeException(NameOf(index))
+            End If
+            Return Me._tr.SubChar(Me.[Start] + index)
+        End Function
+
+        ''' <summary>
         ''' このインスタンスの文字列表現を取得します。
         ''' </summary>
         ''' <returns>文字列表現。</returns>

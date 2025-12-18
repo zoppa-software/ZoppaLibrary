@@ -18,76 +18,363 @@ Namespace EBNF
         ''' ルールのパターンを取得する。
         ''' </summary>
         ''' <returns>ルールのパターン。</returns>
-        Public ReadOnly Property Pattern As ICompiledExpression
+        Public ReadOnly Property Pattern As EvaluateExpression
 
         ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="name">ルール名。</param>
-        ''' <param name="pattern">ルールのパターンを表す <see cref="ExpressionRange"/>。</param>
-        Public Sub New(name As String, pattern As ExpressionRange)
+        ''' <param name="targets">ルールのパターンを表す <see cref="ExpressionRange"/>。</param>
+        Public Sub New(name As String, targets As ExpressionRange)
             Me.RuleName = name
-            Me.Pattern = Compile(pattern)
+
+            ' ルートを作成
+            Dim nodes As New NodeList()
+            Dim startNode = nodes.NewNode()
+            Dim routes = CreateRoute(nodes, targets)
+            Dim endNode = nodes.NewNode()
+
+            startNode.Routes.Add(routes.st)
+            routes.ed.Routes.Add(endNode)
+
+            ' ノードのリンクを作成
+            Dim pattern As New SortedDictionary(Of Integer, NodeLink)()
+            CreatePattern(pattern, startNode, endNode)
+            For i As Integer = 1 To nodes.Count - 2
+                If Not nodes(i).IsEpsilon Then
+                    CreatePattern(pattern, nodes(i), endNode)
+                End If
+            Next
+            pattern.Add(endNode.Id, New NodeLink(endNode))
+
+            ' 評価用グラフを作成
+            Dim links As New SortedDictionary(Of Integer, EvaluateExpression)()
+            For Each kvp In pattern
+                Dim nd = kvp.Value.StartNode
+                links.Add(nd.Id, New EvaluateExpression(nd.Id = startNode.Id, nd.Id = endNode.Id, nd.Range))
+            Next
+            For Each kvp In pattern
+                Dim nodeExpr = links(kvp.Key)
+                For Each endNode In kvp.Value.EndNodes
+                    If links.ContainsKey(endNode.Id) Then
+                        nodeExpr.evaluateExpressions.Add(links(endNode.Id))
+                    End If
+                Next
+            Next
+
+            Me.Pattern = links(startNode.Id)
         End Sub
 
+#Region "ルート作成"
+
         ''' <summary>
-        ''' 指定された式範囲をコンパイルします。
+        ''' ルートを作成します。
         ''' </summary>
-        ''' <param name="target">式範囲。</param>
-        ''' <returns>コンパイル済み式。</returns>
-        Private Shared Function Compile(target As ExpressionRange) As ICompiledExpression
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function CreateRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
             Select Case target.Expr.GetType()
+                Case GetType(AlternationExpression)
+                    ' 選択式
+                    Return If(target.SubRanges.Count > 1,
+                              AlternationRoute(nodes, target),
+                              CreateRoute(nodes, target.SubRanges(0)))
+
                 Case GetType(CharacterExpression)
-                    Return New TerminalCompiledExpression(target)
+                    ' 文字式
+                    Return DirectRoute(nodes, target)
+
+                Case GetType(ConcatenationExpression)
+                    ' 連結式
+                    Return If(target.SubRanges.Count > 1,
+                              ConcatenationRoute(nodes, target),
+                              CreateRoute(nodes, target.SubRanges(0)))
+
+                Case GetType(FactorExpression)
+                    ' 要素式
+                    If target.SubRanges.Count > 1 Then
+                        Select Case target.SubRanges(1).ToString()
+                            Case "?"c
+                                Return ZeroOrOneRoute(nodes, target.SubRanges(0))
+                            Case "*"c
+                                Return ZeroOrMoreRoute(nodes, target.SubRanges(0))
+                            Case "+"c
+                                Return OneOrMoreRoute(nodes, target.SubRanges(0))
+                            Case Else
+                                ' 否定式
+                                Return DirectRoute(nodes, target)
+                        End Select
+                    Else
+                        Return CreateRoute(nodes, target.SubRanges(0))
+                    End If
+
                 Case GetType(IdentifierExpression)
-                    Return New IdentifierCompiledExpression(target)
-                Case GetType(TerminalExpression)
-                    Return New TerminalCompiledExpression(target.SubRanges(0))
+                    ' 識別子式
+                    Return DirectRoute(nodes, target)
+
                 Case GetType(SpecialSeqExpression)
-                    Return New SpecialSeqCompiledExpression(target)
+                    ' 特殊式
+                    Return DirectRoute(nodes, target)
+
                 Case GetType(TermExpression)
+                    ' 終端式
                     Select Case target.SubRanges(0).Expr.GetType()
                         Case GetType(TerminalExpression), GetType(IdentifierExpression)
-                            Return Compile(target.SubRanges(0))
+                            Return CreateRoute(nodes, target.SubRanges(0))
                         Case Else
-                            Dim compiledSubRanges As New List(Of ICompiledExpression)()
-                            For Each sr In target.SubRanges
-                                compiledSubRanges.Add(Compile(sr))
-                            Next
-                            Return New TermCompiledExpression(target, compiledSubRanges)
+                            Select Case target.SubChar(0)
+                                Case "["c
+                                    Return ZeroOrOneRoute(nodes, target.SubRanges(0))
+                                Case "{"c
+                                    Return ZeroOrMoreRoute(nodes, target.SubRanges(0))
+                                Case Else
+                                    Return CreateRoute(nodes, target.SubRanges(0))
+                            End Select
                     End Select
-                Case GetType(FactorExpression)
-                    Return If(target.SubRanges.Count > 1,
-                        New FactorCompiledExpression(target, CompileForSubRanges(target)),
-                        Compile(target.SubRanges(0))
-                    )
-                Case GetType(ConcatenationExpression)
-                    Return If(target.SubRanges.Count > 1,
-                        New ConcatenationCompiledExpression(target, CompileForSubRanges(target)),
-                        Compile(target.SubRanges(0))
-                    )
-                Case GetType(AlternationExpression)
-                    Return If(target.SubRanges.Count > 1,
-                        New AlternationCompiledExpression(target, CompileForSubRanges(target)),
-                        Compile(target.SubRanges(0))
-                    )
+
+                Case GetType(TerminalExpression)
+                    ' 終端記号
+                    Return DirectRoute(nodes, target)
+
                 Case Else
                     Throw New Exception("未知の式タイプです。")
             End Select
         End Function
 
         ''' <summary>
-        ''' 指定された式範囲のサブ式をコンパイルします。
+        ''' 単純比較ルートを作成します。
         ''' </summary>
-        ''' <param name="target">式範囲。</param>
-        ''' <returns>コンパイル済み式の列挙。</returns>
-        Private Shared Function CompileForSubRanges(target As ExpressionRange) As IEnumerable(Of ICompiledExpression)
-            Dim compiledSubRanges As New List(Of ICompiledExpression)()
-            For Each sr In target.SubRanges
-                compiledSubRanges.Add(Compile(sr))
-            Next
-            Return compiledSubRanges
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function DirectRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode(target)
+            Dim endNode = nodes.NewNode()
+
+            ' 一致接続
+            startNode.Routes.Add(endNode)
+
+            Return (startNode, endNode)
         End Function
+
+        ''' <summary>
+        ''' 選択ルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function AlternationRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode()
+            Dim endNode = nodes.NewNode()
+
+            ' 開始点と終了点の間に選択肢を接続
+            For Each subRange In target.SubRanges
+                Dim subRoute = CreateRoute(nodes, subRange)
+                startNode.Routes.Add(subRoute.st)
+                subRoute.ed.Routes.Add(endNode)
+            Next
+            Return (startNode, endNode)
+        End Function
+
+        ''' <summary>
+        ''' 連結ルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function ConcatenationRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            ' 最初のルートを作成
+            Dim curNode = CreateRoute(nodes, target.SubRanges(0))
+
+            ' それ以降のルートを連結
+            For i As Integer = 1 To target.SubRanges.Count - 1
+                Dim subRoute = CreateRoute(nodes, target.SubRanges(i))
+                curNode.ed.Routes.Add(subRoute.st)
+                curNode = (curNode.st, subRoute.ed)
+            Next
+            Return curNode
+        End Function
+
+        ''' <summary>
+        ''' 0回または1回のルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function ZeroOrOneRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode()
+            Dim midRoute = CreateRoute(nodes, target)
+            Dim endNode = nodes.NewNode()
+
+            ' 開始点から中間点、中間点から終了点、開始点から終了点へ接続
+            startNode.Routes.Add(midRoute.st)
+            midRoute.ed.Routes.Add(endNode)
+            startNode.Routes.Add(endNode)
+
+            Return (startNode, endNode)
+        End Function
+
+        ''' <summary>
+        ''' 0回以上のルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function ZeroOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode()
+            Dim midRoute = CreateRoute(nodes, target)
+            Dim endNode = nodes.NewNode()
+
+            ' 開始点から中間点、中間点から終了点、開始点と終了点の相互へ接続
+            startNode.Routes.Add(midRoute.st)
+            startNode.Routes.Add(endNode)
+            midRoute.ed.Routes.Add(endNode)
+            endNode.Routes.Add(startNode)
+
+            Return (startNode, endNode)
+        End Function
+
+        ''' <summary>
+        ''' 1回以上のルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function OneOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode()
+            Dim midRoute = CreateRoute(nodes, target)
+            Dim endNode = nodes.NewNode()
+
+            ' 開始点から中間点、中間点から終了点、終了点から開始点へ接続
+            startNode.Routes.Add(midRoute.st)
+            midRoute.ed.Routes.Add(endNode)
+            endNode.Routes.Add(startNode)
+
+            Return (startNode, endNode)
+        End Function
+
+#End Region
+
+#Region "パターン作成"
+
+        ''' <summary>
+        ''' パターンを作成します。
+        ''' </summary>
+        ''' <param name="pattern">パターン格納用辞書。</param>
+        ''' <param name="startNode">開始ノード。</param>
+        ''' <param name="endNode">終了ノード。</param>
+        Private Shared Sub CreatePattern(pattern As SortedDictionary(Of Integer, NodeLink),
+                                         startNode As Node,
+                                         endNode As Node)
+            Dim res As New NodeLink(startNode)
+            Dim arrived As New HashSet(Of Integer)()
+            CreatePattern(res, arrived, startNode, endNode)
+            pattern.Add(startNode.Id, res)
+        End Sub
+
+        ''' <summary>
+        ''' パターンを作成します。
+        ''' </summary>
+        ''' <param name="pattern">パターン格納用。</param>
+        ''' <param name="arrived">到達済みノードIDセット。</param>
+        ''' <param name="startNode">開始ノード。</param>
+        ''' <param name="endNode">終了ノード。</param>
+        Private Shared Sub CreatePattern(pattern As NodeLink,
+                                         arrived As HashSet(Of Integer),
+                                         startNode As Node,
+                                         endNode As Node)
+            For Each nd In startNode.Routes
+                If Not arrived.Contains(nd.Id) Then
+                    arrived.Add(nd.Id)
+                    If nd.Id = endNode.Id Then
+                        pattern.EndNodes.Add(nd)
+                    ElseIf nd.IsEpsilon Then
+                        CreatePattern(pattern, arrived, nd, endNode)
+                    Else
+                        pattern.EndNodes.Add(nd)
+                    End If
+                End If
+            Next
+        End Sub
+
+#End Region
+
+        ''' <summary>評価ノード。</summary>
+        Private Structure Node
+
+            ''' <summary>識別値。</summary>
+            Public ReadOnly Property Id As Integer
+
+            ''' <summary>εか。</summary>
+            Public ReadOnly Property IsEpsilon As Boolean
+
+            ''' <summary>評価範囲。</summary>
+            Public ReadOnly Property Range As ExpressionRange
+
+            ''' <summary>接続ルート。</summary>
+            Public ReadOnly Property Routes As List(Of Node)
+
+            ''' <summary>コンストラクタ。</summary>
+            ''' <param name="id">識別値。</param>
+            Public Sub New(id As Integer)
+                Me.Id = id
+                Me.IsEpsilon = True
+                Me.Range = ExpressionRange.Invalid
+                Me.Routes = New List(Of Node)()
+            End Sub
+
+            ''' <summary>コンストラクタ。</summary>
+            ''' <param name="id">識別値。</param>
+            ''' <param name="range">評価範囲。</param>
+            Public Sub New(id As Integer, range As ExpressionRange)
+                Me.Id = id
+                Me.IsEpsilon = False
+                Me.Range = range
+                Me.Routes = New List(Of Node)()
+            End Sub
+        End Structure
+
+        ''' <summary>ノードリスト。</summary>
+        Private NotInheritable Class NodeList
+            Inherits List(Of Node)
+
+            ''' <summary>評価範囲の設定して評価ノードを新規作成してリストに追加します。</summary>
+            ''' <param name="range">評価範囲。</param>
+            ''' <returns>評価ノード。</returns>
+            Public Function NewNode(range As ExpressionRange) As Node
+                Dim nd As New Node(Me.Count, range)
+                Me.Add(nd)
+                Return nd
+            End Function
+
+            ''' <summary>評価ノードを新規作成してリストに追加します。</summary>
+            ''' <returns>評価ノード。</returns>
+            Public Function NewNode() As Node
+                Dim nd As New Node(Me.Count)
+                Me.Add(nd)
+                Return nd
+            End Function
+
+        End Class
+
+        ''' <summary>ノードパターン。</summary>
+        Private NotInheritable Class NodeLink
+
+            ''' <summary>開始ノード。</summary>
+            Public ReadOnly Property StartNode As Node
+
+            ''' <summary>終了ノードリスト。</summary>
+            Public ReadOnly Property EndNodes As List(Of Node)
+
+            ''' <summary>コンストラクタ。</summary>
+            ''' <param name="startNode">開始ノード。</param>
+            Public Sub New(startNode As Node)
+                Me.StartNode = startNode
+                Me.EndNodes = New List(Of Node)()
+            End Sub
+
+        End Class
 
     End Class
 
