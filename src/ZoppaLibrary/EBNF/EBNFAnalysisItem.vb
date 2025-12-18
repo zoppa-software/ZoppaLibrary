@@ -43,6 +43,46 @@ Namespace EBNF
         End Property
 
         ''' <summary>
+        ''' 指定したインデックスまたは識別子に対応する範囲を取得します。
+        ''' </summary>
+        ''' <param name="index">インデックス。</param>
+        ''' <returns>対応する範囲。</returns>
+        Default Public ReadOnly Property Item(index As Integer) As EBNFAnalysisItem
+            Get
+                If index >= 0 AndAlso index < Me._answers.Count Then
+                    Return Me._answers(index)
+                Else
+                    Throw New IndexOutOfRangeException($"インデックス '{index}' が範囲外です。")
+                End If
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' 指定した識別子に対応する範囲を取得します。
+        ''' </summary>
+        ''' <param name="ident">識別子。</param>
+        ''' <returns>対応する範囲。</returns>
+        Default Public ReadOnly Property Item(ident As String) As EBNFAnalysisItem
+            Get
+                For Each ans As EBNFAnalysisItem In Me._answers
+                    If ans.Identifier = ident Then
+                        Return ans
+                    End If
+                Next
+                Throw New KeyNotFoundException($"識別子 '{ident}' の範囲が見つかりません。")
+            End Get
+        End Property
+
+        ''' <summary>
+        ''' 範囲内の解析結果の数を取得します。
+        ''' </summary>
+        Public ReadOnly Property Count As Integer
+            Get
+                Return Me._answers.Count
+            End Get
+        End Property
+
+        ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="ident">範囲の識別子。</param>
@@ -61,6 +101,21 @@ Namespace EBNF
             Me.Start = startPos
             Me.End = endPos
         End Sub
+
+        ''' <summary>
+        ''' 指定した識別子に対応する範囲をすべて取得します。
+        ''' </summary>
+        ''' <param name="ident">識別子。</param>
+        ''' <returns>対応する範囲のリスト。</returns>
+        Public Function SearchByName(ident As String) As EBNFAnalysisItem
+            Dim res As New List(Of EBNFAnalysisItem)
+            For Each ans As EBNFAnalysisItem In Me._answers
+                If ans.Identifier = ident Then
+                    res.Add(ans)
+                End If
+            Next
+            Return New EBNFAnalysisItem(ident, res, Me._tr, Me.Start, Me.End)
+        End Function
 
         ''' <summary>
         ''' この範囲の文字列を取得します。

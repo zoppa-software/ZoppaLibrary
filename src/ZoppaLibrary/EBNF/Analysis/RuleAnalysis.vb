@@ -6,7 +6,8 @@ Namespace EBNF
     ''' <summary>
     ''' ルールのコンパイル済み式を表します。
     ''' </summary>
-    Public NotInheritable Class RuleCompiledExpression
+    Public NotInheritable Class RuleAnalysis
+        Implements IAnalysis
 
         ''' <summary>
         ''' ルール名を取得する。
@@ -18,7 +19,7 @@ Namespace EBNF
         ''' ルールのパターンを取得する。
         ''' </summary>
         ''' <returns>ルールのパターン。</returns>
-        Public ReadOnly Property Pattern As EvaluateExpression
+        Public ReadOnly Property Pattern As List(Of IAnalysis) Implements IAnalysis.Pattern
 
         ''' <summary>
         ''' コンストラクタ。
@@ -48,21 +49,40 @@ Namespace EBNF
             pattern.Add(endNode.Id, New NodeLink(endNode))
 
             ' 評価用グラフを作成
-            Dim links As New SortedDictionary(Of Integer, EvaluateExpression)()
+            Dim links As New SortedDictionary(Of Integer, IAnalysis)()
             For Each kvp In pattern
-                Dim nd = kvp.Value.StartNode
-                links.Add(nd.Id, New EvaluateExpression(nd.Id = startNode.Id, nd.Id = endNode.Id, nd.Range))
+                With kvp.Value.StartNode
+                    Dim ana As IAnalysis = Nothing
+                    If .Id = endNode.Id Then
+                        ana = CompletedAnalysis.Instance
+                    ElseIf .Id = startNode.Id Then
+                        ana = New BeginAnalysis(.Range)
+                    Else
+                        Select Case .Range.Expr.GetType()
+                            Case GetType(FactorExpression) ' 要素式
+                                ana = New FactorAnalysis(.Range)
+                            Case GetType(IdentifierExpression) ' 識別子式
+                                ana = New IdentifierAnalysis(.Range)
+                            Case GetType(SpecialSeqExpression) ' 特殊式
+                                ana = New SpecialSeqAnalysis(.Range)
+                            Case GetType(TerminalExpression) ' 終端記号
+                                ana = New TerminalAnalysis(.Range)
+                            Case Else
+                                Throw New NotSupportedException($"サポートされていない式タイプです: { .Range.Expr.GetType().FullName }")
+                        End Select
+                    End If
+                    links.Add(.Id, ana)
+                End With
             Next
             For Each kvp In pattern
-                Dim nodeExpr = links(kvp.Key)
                 For Each endNode In kvp.Value.EndNodes
                     If links.ContainsKey(endNode.Id) Then
-                        nodeExpr.evaluateExpressions.Add(links(endNode.Id))
+                        links(kvp.Key).Pattern.Add(links(endNode.Id))
                     End If
                 Next
             Next
 
-            Me.Pattern = links(startNode.Id)
+            Me.Pattern = links(startNode.Id).Pattern
         End Sub
 
 #Region "ルート作成"
@@ -299,6 +319,36 @@ Namespace EBNF
         End Sub
 
 #End Region
+
+        ''' <summary>
+        ''' 解析を実行する。
+        ''' </summary>
+        ''' <param name="tr">位置調整リーダー。</param>
+        ''' <param name="env">解析環境。</param>
+        ''' <param name="ruleTable">ルール解析テーブル。</param>
+        ''' <param name="specialMethods">特殊メソッドテーブル。</param>
+        ''' <param name="ruleName">現在のルール名。</param>
+        ''' <param name="answers">解析結果のリスト。</param>
+        ''' <returns>解析が成功した場合に True を返します。</returns>
+        Public Function Match(tr As IPositionAdjustReader,
+                              env As EBNFEnvironment,
+                              ruleTable As SortedDictionary(Of String, RuleAnalysis),
+                              specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
+                              ruleName As String,
+                              answers As List(Of EBNFAnalysisItem)) As Boolean Implements IAnalysis.Match
+            Dim snap = tr.MemoryPosition()
+
+            ' ルールパターンを順に評価
+            For Each evalExpr In Me.Pattern
+                answers.Clear()
+                If evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers) Then
+                    Return True
+                End If
+            Next
+
+            snap.Restore()
+            Return False
+        End Function
 
         ''' <summary>評価ノード。</summary>
         Private Structure Node

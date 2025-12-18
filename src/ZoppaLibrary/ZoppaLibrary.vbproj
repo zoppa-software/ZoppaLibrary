@@ -6,9 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="EBNF\Compiled\AlternationCompiledExpression2.vb" />
-    <Compile Remove="EBNF\Compiled\IdentifierCompiledExpression.vb" />
-    <Compile Remove="EBNF\Compiled\SpecialSeqCompiledExpression.vb" />
+    <Compile Remove="EBNF\Analysis\AlternationCompiledExpression2.vb" />
+    <Compile Remove="EBNF\Analysis\IdentifierCompiledExpression.vb" />
+    <Compile Remove="EBNF\Analysis\SpecialSeqCompiledExpression.vb" />
   </ItemGroup>
 
 </Project>

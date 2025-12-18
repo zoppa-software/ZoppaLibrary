@@ -17,32 +17,30 @@ Namespace EBNF
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As IPositionAdjustReader,
                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
                                           ident As String,
-                                          target As IPositionAdjustReader,
-                                          Optional debugMode As Boolean = False) As EBNFEnvironment
+                                          target As IPositionAdjustReader) As EBNFEnvironment
             '  メソッドテーブルを作成
-            Dim answerEnv = CompileEnvironment(rules, addSpecMethods, debugMode)
+            Dim answerEnv = CompileEnvironment(rules, addSpecMethods)
 
             ' 解析を実行
             If answerEnv.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
                 Dim answers As New List(Of EBNFAnalysisItem)()
-                Dim message As New DebugMessage(target)
-                If answerEnv.RuleTable(ident).Pattern.Match(target, answerEnv.RuleTable, answerEnv.MethodTable, answers, debugMode, message) Then
+
+                If answerEnv.RuleTable(ident).Match(target, answerEnv, answerEnv.RuleTable, answerEnv.MethodTable, ident, answers) Then
                     If target.Peek() = -1 Then
                         ' 解析成功
                         answerEnv.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
                         Return answerEnv
                     End If
                 End If
-                Throw New ArgumentException($"識別子 '{ident}' の解析に失敗しました。...{message.GetUnmatchedMessage()}")
+                answerEnv.ThrowFailureException(ident)
             End If
-            Throw New ArgumentException($"指定された識別子 '{ident}' はルールに存在しません。", ident)
+            Throw New EBNFException($"指定された識別子 '{ident}' はルールに存在しません。")
         End Function
 
         ''' <summary>
@@ -51,14 +49,12 @@ Namespace EBNF
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As IPositionAdjustReader,
                                           ident As String,
-                                          target As IPositionAdjustReader,
-                                          Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileToEvaluate(rules, Nothing, ident, target, debugMode)
+                                          target As IPositionAdjustReader) As EBNFEnvironment
+            Return CompileToEvaluate(rules, Nothing, ident, target)
         End Function
 
         ''' <summary>
@@ -68,15 +64,13 @@ Namespace EBNF
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す文字列。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As String,
                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
                                           ident As String,
-                                          target As IPositionAdjustReader,
-                                          Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, target, debugMode)
+                                          target As IPositionAdjustReader) As EBNFEnvironment
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, target)
         End Function
 
         ''' <summary>
@@ -85,14 +79,12 @@ Namespace EBNF
         ''' <param name="rules">ルール群を表す文字列。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As String,
                                           ident As String,
-                                          target As IPositionAdjustReader,
-                                          Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, target, debugMode)
+                                          target As IPositionAdjustReader) As EBNFEnvironment
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, target)
         End Function
 
         ''' <summary>
@@ -102,7 +94,6 @@ Namespace EBNF
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す文字列。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As String,
@@ -110,7 +101,7 @@ Namespace EBNF
                                           ident As String,
                                           target As String,
                                           Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, New PositionAdjustStringReader(target), debugMode)
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, New PositionAdjustStringReader(target))
         End Function
 
         ''' <summary>
@@ -119,14 +110,13 @@ Namespace EBNF
         ''' <param name="rules">ルール群を表す文字列。</param>
         ''' <param name="ident">解析を開始する識別子。</param>
         ''' <param name="target">解析対象を表す文字列。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As String,
                                           ident As String,
                                           target As String,
                                           Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, New PositionAdjustStringReader(target), debugMode)
+            Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, New PositionAdjustStringReader(target))
         End Function
 
         ''' <summary>
@@ -134,13 +124,11 @@ Namespace EBNF
         ''' </summary>
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="EBNFEnvironment"/>。</returns>
         Public Function CompileEnvironment(rules As IPositionAdjustReader,
-                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
-                                           Optional debugMode As Boolean = False) As EBNFEnvironment
+                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)))) As EBNFEnvironment
             '  メソッドテーブルを作成
-            Dim answerEnv As New EBNFEnvironment(debugMode)
+            Dim answerEnv As New EBNFEnvironment()
             If addSpecMethods IsNot Nothing Then
                 addSpecMethods(answerEnv.MethodTable)
             End If
@@ -158,10 +146,9 @@ Namespace EBNF
         ''' 指定されたルール群に基づいてルールテーブルを作成します。
         ''' </summary>
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="EBNFEnvironment"/>。</returns>
-        Public Function CompileEnvironment(rules As IPositionAdjustReader, Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileEnvironment(rules, Nothing, debugMode)
+        Public Function CompileEnvironment(rules As IPositionAdjustReader) As EBNFEnvironment
+            Return CompileEnvironment(rules, Nothing)
         End Function
 
         ''' <summary>
@@ -169,22 +156,20 @@ Namespace EBNF
         ''' </summary>
         ''' <param name="rules">ルール群を表す文字列。</param>
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="EBNFEnvironment"/>。</returns>
         Public Function CompileEnvironment(rules As String,
                                            addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
                                            Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileEnvironment(New PositionAdjustStringReader(rules), addSpecMethods, debugMode)
+            Return CompileEnvironment(New PositionAdjustStringReader(rules), addSpecMethods)
         End Function
 
         ''' <summary>
         ''' 指定されたルール群に基づいてルールテーブルを作成します。
         ''' </summary>
         ''' <param name="rules">ルール群を表す文字列。</param>
-        ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
         ''' <returns>ルールテーブルを含む <see cref="EBNFEnvironment"/>。</returns>
-        Public Function CompileEnvironment(rules As String, Optional debugMode As Boolean = False) As EBNFEnvironment
-            Return CompileEnvironment(New PositionAdjustStringReader(rules), Nothing, debugMode)
+        Public Function CompileEnvironment(rules As String) As EBNFEnvironment
+            Return CompileEnvironment(New PositionAdjustStringReader(rules), Nothing)
         End Function
 
         ''' <summary>
@@ -192,12 +177,12 @@ Namespace EBNF
         ''' </summary>
         ''' <param name="range">ルール群を表す <see cref="ExpressionRange"/>。</param>
         ''' <returns>ルールテーブル。</returns>
-        Private Function CreateRuleTable(range As ExpressionRange) As SortedDictionary(Of String, RuleCompiledExpression)
-            Dim ruleTable As New SortedDictionary(Of String, RuleCompiledExpression)()
+        Private Function CreateRuleTable(range As ExpressionRange) As SortedDictionary(Of String, RuleAnalysis)
+            Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
             For Each sr In range.SubRanges
                 Dim key = sr.SubRanges(0).ToString()
                 If Not ruleTable.ContainsKey(key) Then
-                    ruleTable.Add(key, New RuleCompiledExpression(key, sr.SubRanges(1)))
+                    ruleTable.Add(key, New RuleAnalysis(key, sr.SubRanges(1)))
                 End If
             Next
             Return ruleTable
@@ -216,17 +201,17 @@ Namespace EBNF
             If env.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
                 Dim answers As New List(Of EBNFAnalysisItem)()
-                Dim message As New DebugMessage(target)
-                If env.RuleTable(ident).Pattern.Match(target, env.RuleTable, env.MethodTable, answers, env.DebugMode, message) Then
+
+                If env.RuleTable(ident).Match(target, env, env.RuleTable, env.MethodTable, ident, answers) Then
                     If target.Peek() = -1 Then
                         ' 解析成功
                         env.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
                         Return env.Answer
                     End If
                 End If
-                Throw New ArgumentException($"識別子 '{ident}' の解析に失敗しました。...{message.GetUnmatchedMessage()}")
+                env.ThrowFailureException(ident)
             End If
-            Throw New ArgumentException($"指定された識別子 '{ident}' はルールに存在しません。", ident)
+            Throw New EBNFException($"指定された識別子 '{ident}' はルールに存在しません。")
         End Function
 
         ''' <summary>
@@ -519,12 +504,7 @@ Namespace EBNF
             ''' <summary>
             ''' ルールテーブル。
             ''' </summary>
-            Public ReadOnly Property RuleTable As SortedDictionary(Of String, RuleCompiledExpression)
-
-            ''' <summary>
-            ''' デバッグモードで動作するかどうかを示す値。
-            ''' </summary>
-            Public ReadOnly Property DebugMode As Boolean
+            Public ReadOnly Property RuleTable As SortedDictionary(Of String, RuleAnalysis)
 
             ''' <summary>
             ''' 解析結果
@@ -532,16 +512,33 @@ Namespace EBNF
             Public Property Answer As EBNFAnalysisItem
 
             ''' <summary>
+            ''' 解析失敗情報：失敗したルール名。
+            ''' </summary>
+            Private _failRuleName As String = ""
+
+            ''' <summary>
+            ''' 解析失敗情報：失敗した位置調整リーダー。
+            ''' </summary>
+            Private _failTr As IPositionAdjustReader = Nothing
+
+            ''' <summary>
+            ''' 解析失敗情報：失敗した位置。
+            ''' </summary>
+            Private _failPos As Integer = -1
+
+            ''' <summary>
+            ''' 解析失敗情報：失敗した評価範囲。
+            ''' </summary>
+            Private _failRange As ExpressionRange = Nothing
+
+            ''' <summary>
             ''' コンストラクター
             ''' </summary>
-            ''' <param name="debugMode">デバッグモードで動作するかどうかを示す値。</param>
-            Public Sub New(debugMode As Boolean)
+            Public Sub New()
                 Me.MethodTable = New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
                 Me.InnerClearSpecialMethods()
 
-                Me.RuleTable = New SortedDictionary(Of String, RuleCompiledExpression)()
-
-                Me.DebugMode = debugMode
+                Me.RuleTable = New SortedDictionary(Of String, RuleAnalysis)()
             End Sub
 
             ''' <summary>
@@ -574,59 +571,30 @@ Namespace EBNF
                 End If
             End Sub
 
-        End Class
-
-        ''' <summary>
-        ''' デバッグメッセージを保持するクラス。
-        ''' </summary>
-        Public NotInheritable Class DebugMessage
-
             ''' <summary>
-            ''' 文字参照インターフェース。
+            ''' 解析失敗情報を設定します。
             ''' </summary>
-            Private ReadOnly _tar As IPositionAdjustReader
-
-            ''' <summary>
-            ''' メッセージリスト。
-            ''' </summary>
-            Private ReadOnly _msgs As New List(Of String)
-
-            ''' <summary>
-            ''' 不一致メッセージ。
-            ''' </summary>
-            Private _unmatched As String = ""
-
-            ''' <summary>
-            ''' コンストラクタ。
-            ''' </summary>
-            ''' <param name="target">文字参照。</param>
-            Public Sub New(target As IPositionAdjustReader)
-                _tar = target
+            ''' <param name="failRuleName">失敗したルール名。</param>
+            ''' <param name="failTr">失敗した位置調整リーダー。</param>
+            ''' <param name="failPos">失敗した位置。</param>
+            ''' <param name="failRange">失敗した評価範囲。</param>
+            Public Sub SetFailureInformation(failRuleName As String,
+                                             failTr As IPositionAdjustReader,
+                                             failPos As Integer,
+                                             failRange As ExpressionRange)
+                Me._failRuleName = failRuleName
+                Me._failTr = failTr
+                Me._failPos = failPos
+                Me._failRange = failRange
             End Sub
 
             ''' <summary>
-            ''' メッセージを追加する。
+            ''' 解析失敗例外をスローします。
             ''' </summary>
-            ''' <param name="msg">メッセージ。</param>
-            Public Sub Add(msg As String)
-                _msgs.Add(msg)
+            ''' <param name="ident">失敗した識別子。</param>
+            Public Sub ThrowFailureException(ident As String)
+                Throw New EBNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}, 文字列: {Me._failTr.Substring(Me._failPos)}")
             End Sub
-
-            ''' <summary>
-            ''' 不一致メッセージを設定する。
-            ''' </summary>
-            ''' <param name="msg">不一致メッセージ。</param>
-            Public Sub SetUnmatched(msg As String)
-                _unmatched = msg
-            End Sub
-
-            ''' <summary>
-            ''' 不一致メッセージを取得する。
-            ''' </summary>
-            ''' <returns>不一致メッセージ。</returns>
-            Public Function GetUnmatchedMessage() As String
-                Return If(_unmatched <> "", _unmatched, _tar.Substring(_tar.Position))
-            End Function
 
         End Class
 

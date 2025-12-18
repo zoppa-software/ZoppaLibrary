@@ -160,17 +160,17 @@ grammar = add_or_sub;"
         Dim ans7 = env.Evaluate("number", "6.626e-34")
         Assert.Equal("6.626e-34", ans7.ToString())
 
-        Assert.Throws(Of ArgumentException)(
+        Assert.Throws(Of EBNFException)(
             Sub()
                 env.Evaluate("number", ".7")
             End Sub
         )
-        Assert.Throws(Of ArgumentException)(
+        Assert.Throws(Of EBNFException)(
             Sub()
                 env.Evaluate("number", "7.")
             End Sub
         )
-        Assert.Throws(Of ArgumentException)(
+        Assert.Throws(Of EBNFException)(
             Sub()
                 env.Evaluate("number", "3.e+20")
             End Sub
@@ -305,6 +305,52 @@ grammar = add_or_sub;"
         'CreateRuleTable(range)
 
         Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
+        Dim answer1 = EBNFEvaluate.Run(Of Integer)(analysised1, AddressOf Evaluate2)
+        Assert.Equal(9, answer1)
+    End Sub
+
+    <Fact>
+    Public Sub NumberTest4()
+        Dim input = "" &
+"area = number+;
+mid = number, number, number;
+last = number, number, number, number;
+number = ""0"" | ""1"" | ""2"" | ""3"" | ""4"" | ""5"" | ""6"" | ""7"" | ""8"" | ""9"" ;
+tel = [area, ""-""], mid, [""-""], last;"
+
+        Dim ans1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "9482908")
+        Dim ans1_1 = ans1.Answer("mid")
+        Assert.Equal("948", ans1_1.ToString())
+        Dim ans1_2 = ans1.Answer("last")
+        Assert.Equal("2908", ans1_2.ToString())
+
+        Dim ans2 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "03-9482908")
+        Dim ans2_1 = ans2.Answer("area")
+        Assert.Equal("03", ans2_1.ToString())
+        Dim ans2_2 = ans2.Answer("mid")
+        Assert.Equal("948", ans2_2.ToString())
+        Dim ans2_3 = ans2.Answer("last")
+        Assert.Equal("2908", ans2_3.ToString())
+
+        Dim ans3 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "03-948-2908")
+        Dim ans3_1 = ans3.Answer("area")
+        Assert.Equal("03", ans3_1.ToString())
+        Dim ans3_2 = ans3.Answer("mid")
+        Assert.Equal("948", ans3_2.ToString())
+        Dim ans3_3 = ans3.Answer("last")
+        Assert.Equal("2908", ans3_3.ToString())
+
+        Assert.Throws(Of EBNFException)(
+            Sub()
+                EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "948-AABB")
+            End Sub
+        )
+
+        Assert.Throws(Of EBNFException)(
+            Sub()
+                EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "94P-AABB")
+            End Sub
+        )
     End Sub
 
 End Class
