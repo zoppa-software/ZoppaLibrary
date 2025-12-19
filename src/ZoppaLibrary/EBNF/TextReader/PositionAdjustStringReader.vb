@@ -1,7 +1,9 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.Drawing
 Imports System.IO
+Imports System.Reflection
 Imports System.Text
 
 Namespace EBNF
@@ -157,6 +159,22 @@ Namespace EBNF
         End Function
 
         ''' <summary>
+        ''' 指定位置にシークします。
+        ''' </summary>
+        ''' <param name="searchStart">シーク位置。</param>
+        Public Sub Seek(searchStart As Integer) Implements IPositionAdjustReader.Seek
+            If searchStart < Me._readed.Length Then
+                Me._position = searchStart
+            Else
+                While Me._position < searchStart
+                    If Me.Read() < 0 Then
+                        Exit While
+                    End If
+                End While
+            End If
+        End Sub
+
+        ''' <summary>
         ''' 1文字読み取ります。
         ''' </summary>
         ''' <returns>読み取った文字。</returns>
@@ -198,15 +216,6 @@ Namespace EBNF
                 readCount += 1
             End While
             Return readCount
-        End Function
-
-        ''' <summary>
-        ''' 指定された文字数分、末尾からの部分文字列を取得します。
-        ''' </summary>
-        ''' <param name="count">文字数。</param>
-        ''' <returns>取得した部分文字列。</returns>
-        Public Function ToLastString(count As Integer) As String Implements IPositionAdjustReader.ToLastString
-            Return Me._readed.ToString(Math.Max(0, Me._readed.Length - count), Math.Min(count, Me._readed.Length))
         End Function
 
         ''' <summary>

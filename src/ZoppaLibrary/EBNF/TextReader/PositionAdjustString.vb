@@ -56,6 +56,18 @@ Namespace EBNF
         End Function
 
         ''' <summary>
+        ''' 指定位置にシークします。
+        ''' </summary>
+        ''' <param name="searchStart">シーク位置。</param>
+        Public Sub Seek(searchStart As Integer) Implements IPositionAdjustReader.Seek
+            If searchStart < Me._source.Length Then
+                Me._position = searchStart
+            Else
+                Me._position = Me._source.Length
+            End If
+        End Sub
+
+        ''' <summary>
         ''' 1文字読み取ります。
         ''' </summary>
         ''' <returns>読み取った文字。</returns>
@@ -134,15 +146,6 @@ Namespace EBNF
         ''' <returns>スナップショット。</returns>
         Public Function MemoryPosition() As IPositionAdjustReader.IPosition Implements IPositionAdjustReader.MemoryPosition
             Return New SnapshotPosition(Me)
-        End Function
-
-        ''' <summary>
-        ''' 指定された文字数分、末尾からの部分文字列を取得します。
-        ''' </summary>
-        ''' <param name="count">文字数。</param>
-        ''' <returns>取得した部分文字列。</returns>
-        Public Function ToLastString(count As Integer) As String Implements IPositionAdjustReader.ToLastString
-            Return Me._source.Substring(Math.Max(0, Me._position - count), Math.Min(count, Me._position))
         End Function
 
         ''' <summary>

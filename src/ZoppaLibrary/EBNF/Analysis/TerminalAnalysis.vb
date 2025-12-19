@@ -36,6 +36,10 @@ Namespace EBNF
         ''' <param name="str">変換対象の文字列。</param>
         ''' <returns>変換後の文字列。</returns>
         Private Shared Function UnescapedString(str As String) As String
+            If str Is Nothing OrElse str.Length = 0 Then
+                Return String.Empty
+            End If
+
             Dim sb As New Text.StringBuilder()
             Dim i As Integer = 0
             While i < str.Length
@@ -124,6 +128,14 @@ Namespace EBNF
                 End If
             Next
             Return True
+        End Function
+
+        ''' <summary>
+        ''' 文字列表現を取得する。
+        ''' </summary>
+        ''' <returns>文字列表現。</returns>
+        Public Overrides Function ToString() As String
+            Return $"""{Me._range}"""
         End Function
 
     End Class

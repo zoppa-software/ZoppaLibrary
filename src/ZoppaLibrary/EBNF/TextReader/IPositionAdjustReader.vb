@@ -21,6 +21,12 @@ Namespace EBNF
         Function Peek() As Integer
 
         ''' <summary>
+        ''' 指定位置にシークします。
+        ''' </summary>
+        ''' <param name="searchStart">シーク位置。</param>
+        Sub Seek(searchStart As Integer)
+
+        ''' <summary>
         ''' 1文字読み取ります。
         ''' </summary>
         ''' <returns>読み取った文字。</returns>
@@ -68,13 +74,6 @@ Namespace EBNF
         ''' </summary>
         ''' <returns>スナップショット。</returns>
         Function MemoryPosition() As IPosition
-
-        ''' <summary>
-        ''' 指定された文字数分、末尾からの部分文字列を取得します。
-        ''' </summary>
-        ''' <param name="count">文字数。</param>
-        ''' <returns>取得した部分文字列。</returns>
-        Function ToLastString(count As Integer) As String
 
         ''' <summary>
         ''' スナップショットインターフェース。

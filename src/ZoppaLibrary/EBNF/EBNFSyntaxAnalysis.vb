@@ -1,6 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.IO
 Imports System.Runtime.CompilerServices
 
 Namespace EBNF
@@ -99,8 +100,7 @@ Namespace EBNF
         Public Function CompileToEvaluate(rules As String,
                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))),
                                           ident As String,
-                                          target As String,
-                                          Optional debugMode As Boolean = False) As EBNFEnvironment
+                                          target As String) As EBNFEnvironment
             Return CompileToEvaluate(New PositionAdjustStringReader(rules), addSpecMethods, ident, New PositionAdjustStringReader(target))
         End Function
 
@@ -114,8 +114,7 @@ Namespace EBNF
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         Public Function CompileToEvaluate(rules As String,
                                           ident As String,
-                                          target As String,
-                                          Optional debugMode As Boolean = False) As EBNFEnvironment
+                                          target As String) As EBNFEnvironment
             Return CompileToEvaluate(New PositionAdjustStringReader(rules), Nothing, ident, New PositionAdjustStringReader(target))
         End Function
 
@@ -225,6 +224,56 @@ Namespace EBNF
         <Extension()>
         Public Function Evaluate(env As EBNFEnvironment, ident As String, target As String) As EBNFAnalysisItem
             Return Evaluate(env, ident, New PositionAdjustStringReader(target))
+        End Function
+
+        ''' <summary>
+        ''' 指定された識別子、解析対象に基づいて検索を実行します。
+        ''' </summary>
+        ''' <param name="env">構文解析環境。</param>
+        ''' <param name="ident">解析を開始する識別子。</param>
+        ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="searchStart">検索を開始する位置。</param>
+        ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
+        ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
+        <Extension()>
+        Public Function Search(env As EBNFEnvironment, ident As String, target As IPositionAdjustReader, Optional searchStart As Integer = 0) As Integer
+            If env.RuleTable.ContainsKey(ident) Then
+                ' 検索開始位置を移動
+                target.Seek(searchStart)
+
+                ' 検索を実行
+                Dim answers As New List(Of EBNFAnalysisItem)()
+                Dim startPos = target.Position
+                Do While target.Peek() <> -1
+                    For Each evalExpr In env.RuleTable(ident).Pattern
+                        answers.Clear()
+                        If evalExpr.Match(target, env, env.RuleTable, env.MethodTable, ident, answers) Then
+                            env.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
+                            Return startPos
+                        End If
+                    Next
+
+                    target.Seek(startPos + 1)
+                    startPos = target.Position
+                Loop
+
+                Return -1
+            End If
+            Throw New EBNFException($"指定された識別子 '{ident}' はルールに存在しません。")
+        End Function
+
+        ''' <summary>
+        ''' 指定された識別子、解析対象に基づいて検索を実行します。
+        ''' </summary>
+        ''' <param name="env">構文解析環境。</param>
+        ''' <param name="ident">解析を開始する識別子。</param>
+        ''' <param name="target">解析対象を表す文字列。</param>
+        ''' <param name="searchStart">検索を開始する位置。</param>
+        ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
+        ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
+        <Extension()>
+        Public Function Search(env As EBNFEnvironment, ident As String, target As String, Optional searchStart As Integer = 0) As Integer
+            Return Search(env, ident, New PositionAdjustStringReader(target))
         End Function
 
 #Region "特殊メソッド"
@@ -468,7 +517,7 @@ Namespace EBNF
         ''' 連続する数字列を読み取ります。
         ''' </summary>
         ''' <param name="tr">テキストリーダー。
-        ''' </summary>
+        ''' </param>
         ''' <param name="tr"></param>
         Private Sub ReadSeqDigits(tr As IPositionAdjustReader)
             tr.Read()
@@ -594,6 +643,45 @@ Namespace EBNF
             ''' <param name="ident">失敗した識別子。</param>
             Public Sub ThrowFailureException(ident As String)
                 Throw New EBNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}, 文字列: {Me._failTr.Substring(Me._failPos)}")
+            End Sub
+
+            ''' <summary>
+            ''' ルールグラフをデバッグ出力します。
+            ''' </summary>
+            ''' <param name="out">出力先のテキストライター。</param>
+            Public Sub DebugRuleGraphPrint(out As TextWriter)
+                out.WriteLine("***** EBNF ルール *****")
+                For Each kvp In Me.RuleTable
+                    out.WriteLine($"ルール名: {kvp.Key}")
+
+                    Dim arrivals As New HashSet(Of IAnalysis)()
+                    DebugRuleGraphPrint(out, arrivals, kvp.Value)
+                Next
+            End Sub
+
+            ''' <summary>
+            ''' ルールグラフをデバッグ出力します。
+            ''' </summary>
+            ''' <param name="out">出力先のテキストライター。</param>
+            ''' <param name="arrivals">到達済みノード集合。</param>
+            ''' <param name="node">現在のノード。</param>
+            Public Sub DebugRuleGraphPrint(out As TextWriter, arrivals As HashSet(Of IAnalysis), node As IAnalysis)
+                If Not arrivals.Contains(node) Then
+                    arrivals.Add(node)
+
+                    out.Write($"node:{node} -> ")
+                    For Each nextNode In node.Pattern
+                        out.Write($"{nextNode}, ")
+                    Next
+                    out.WriteLine()
+
+                    For Each nextNode In node.Pattern
+                        If TypeOf nextNode Is CompletedAnalysis Then
+                            Continue For
+                        End If
+                        DebugRuleGraphPrint(out, arrivals, nextNode)
+                    Next
+                End If
             End Sub
 
         End Class
