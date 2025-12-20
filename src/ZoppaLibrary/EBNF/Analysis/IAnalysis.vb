@@ -28,7 +28,7 @@ Namespace EBNF
                        ruleTable As SortedDictionary(Of String, RuleAnalysis),
                        specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                        ruleName As String,
-                       answers As List(Of EBNFAnalysisItem)) As Boolean
+                       answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer)
 
     End Interface
 

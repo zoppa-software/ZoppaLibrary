@@ -27,17 +27,16 @@ Namespace EBNF
             '  メソッドテーブルを作成
             Dim answerEnv = CompileEnvironment(rules, addSpecMethods)
 
-            ' 解析を実行
+            ' 対象ルールがあるか確認
             If answerEnv.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
                 Dim answers As New List(Of EBNFAnalysisItem)()
 
-                If answerEnv.RuleTable(ident).Match(target, answerEnv, answerEnv.RuleTable, answerEnv.MethodTable, ident, answers) Then
-                    If target.Peek() = -1 Then
-                        ' 解析成功
-                        answerEnv.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
-                        Return answerEnv
-                    End If
+                ' 解析実行
+                Dim res = answerEnv.RuleTable(ident).Match(target, answerEnv, answerEnv.RuleTable, answerEnv.MethodTable, ident, answers)
+                If res.sccess AndAlso target.Peek() = -1 Then
+                    answerEnv.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
+                    Return answerEnv
                 End If
                 answerEnv.ThrowFailureException(ident)
             End If
@@ -201,12 +200,13 @@ Namespace EBNF
                 Dim startPos = target.Position
                 Dim answers As New List(Of EBNFAnalysisItem)()
 
-                If env.RuleTable(ident).Match(target, env, env.RuleTable, env.MethodTable, ident, answers) Then
-                    If target.Peek() = -1 Then
-                        ' 解析成功
-                        env.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
-                        Return env.Answer
-                    End If
+                ' 解析実行
+                Dim res = env.RuleTable(ident).Match(target, env, env.RuleTable, env.MethodTable, ident, answers)
+
+                ' 解析でき、かつ全て消費した場合は成功
+                If res.sccess AndAlso target.Peek() = -1 Then
+                    env.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
+                    Return env.Answer
                 End If
                 env.ThrowFailureException(ident)
             End If
@@ -241,19 +241,25 @@ Namespace EBNF
                 ' 検索開始位置を移動
                 target.Seek(searchStart)
 
-                ' 検索を実行
                 Dim answers As New List(Of EBNFAnalysisItem)()
                 Dim startPos = target.Position
+
+                ' 検索を実行
                 Do While target.Peek() <> -1
+                    Dim shift As Integer = Integer.MaxValue
+
                     For Each evalExpr In env.RuleTable(ident).Pattern
                         answers.Clear()
-                        If evalExpr.Match(target, env, env.RuleTable, env.MethodTable, ident, answers) Then
+                        Dim res = evalExpr.Match(target, env, env.RuleTable, env.MethodTable, ident, answers)
+                        If res.sccess Then
                             env.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
                             Return startPos
+                        ElseIf res.shift < shift Then
+                            shift = If(res.shift > 0, res.shift, 1)
                         End If
                     Next
 
-                    target.Seek(startPos + 1)
+                    target.Seek(startPos + shift)
                     startPos = target.Position
                 Loop
 
@@ -299,9 +305,29 @@ Namespace EBNF
         End Function
 
         ''' <summary>
+        ''' 空白文字を表す特殊メソッド名を取得します。
+        ''' </summary>
+        Public ReadOnly Property NotSpaceMethodName As String = "Not Space"
+
+        ''' <summary>
+        ''' 空白以外の文字を読み取ります。
+        ''' </summary>
+        ''' <param name="tr">テキストリーダー。</param>
+        ''' <returns>一致したら真。</returns>
+        Private Function NotSpace(tr As IPositionAdjustReader) As Boolean
+            Dim startPos = tr.Position
+            Dim readAny = False
+            While Not Char.IsWhiteSpace(ChrW(tr.Peek()))
+                tr.Read()
+                readAny = True
+            End While
+            Return readAny
+        End Function
+
+        ''' <summary>
         ''' 全ての文字を表す特殊メソッド名を取得します。
         ''' </summary>
-        Public ReadOnly Property AllCharMethodName As String = NameOf(AllChar)
+        Public ReadOnly Property AllCharMethodName As String = "All Char"
 
         ''' <summary>
         ''' 全ての文字を読み取ります。
@@ -604,6 +630,7 @@ Namespace EBNF
                 Me.MethodTable.Add(IntegerMethodName, AddressOf [Integer])
                 Me.MethodTable.Add(NumberMethodName, AddressOf Number)
                 Me.MethodTable.Add(SpaceMethodName, AddressOf Space)
+                Me.MethodTable.Add(NotSpaceMethodName, AddressOf NotSpace)
             End Sub
 
             ''' <summary>

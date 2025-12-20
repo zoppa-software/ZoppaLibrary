@@ -45,37 +45,35 @@ Namespace EBNF
                               ruleTable As SortedDictionary(Of String, RuleAnalysis),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                               ruleName As String,
-                              answers As List(Of EBNFAnalysisItem)) As Boolean Implements IAnalysis.Match
+                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
+            ' 識別子に対応するルールが存在しない場合は例外をスロー
+            If Not ruleTable.ContainsKey(Me._name) Then
+                Throw New KeyNotFoundException($"識別子 '{Me._name}' はルールテーブルに存在しません。")
+            End If
+
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
             Dim subAnswers As New List(Of EBNFAnalysisItem)()
 
             ' 識別子に対応するルールを評価
-            Dim hit = False
-            If ruleTable.ContainsKey(Me._name) Then
-                If ruleTable(Me._name).Match(tr, env, ruleTable, specialMethods, ruleName, subAnswers) Then
-                    answers.Add(New EBNFAnalysisItem(Me._name, subAnswers, tr, startPos, tr.Position))
-                    hit = True
-                End If
-            Else
-                Throw New KeyNotFoundException($"識別子 '{Me._name}' はルールテーブルに存在しません。")
+            Dim res = ruleTable(Me._name).Match(tr, env, ruleTable, specialMethods, ruleName, subAnswers)
+            If res.sccess Then
+                answers.Add(New EBNFAnalysisItem(Me._name, subAnswers, tr, startPos, tr.Position))
             End If
 
             ' 失敗情報を設定
             env.SetFailureInformation(ruleName, tr, startPos, Me._range)
 
             ' 次のパターンを評価
-            If hit Then
-                For Each evalExpr In Me.Pattern
-                    If evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers) Then
-                        Return True
-                    End If
-                Next
+            If res.sccess Then
+                res = Me.AnalysisNextPattern(tr, env, ruleTable, specialMethods, ruleName, answers)
             End If
 
             ' どれもマッチしなかった場合は偽を返す
-            snap.Restore()
-            Return False
+            If Not res.sccess Then
+                snap.Restore()
+            End If
+            Return res
         End Function
 
         ''' <summary>

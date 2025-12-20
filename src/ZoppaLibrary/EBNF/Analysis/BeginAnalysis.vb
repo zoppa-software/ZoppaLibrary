@@ -38,8 +38,8 @@ Namespace EBNF
                               ruleTable As SortedDictionary(Of String, RuleAnalysis),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                               ruleName As String,
-                              answers As List(Of EBNFAnalysisItem)) As Boolean Implements IAnalysis.Match
-            Return True
+                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
+            Return (True, 0)
         End Function
 
         ''' <summary>

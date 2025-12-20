@@ -250,7 +250,7 @@ grammar = add_or_sub;"
     Public Sub StringTest()
         Dim input = "" &
 "S = {? Space ?};
-quo_blk = ""'"", (? AllChar ? - ""'"")+, ""'"";
+quo_blk = ""'"", (? All Char ? - ""'"")+, ""'"";
 add_or_sub = quo_blk, {S, '+', S, quo_blk};
 grammar = add_or_sub;"
 
@@ -263,7 +263,7 @@ grammar = add_or_sub;"
         Dim filtered = values.Where(Function(v) v.Range IsNot Nothing AndAlso v.Range.Identifier <> "S").ToList()
 
         Select Case expr.Identifier
-            Case "AllChar", "Space", "S"
+            Case "All Char", "Space", "S"
                 ' 評価しない
                 Return Nothing
             Case "quo_blk"

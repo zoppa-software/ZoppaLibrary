@@ -12,6 +12,9 @@ Namespace EBNF
         ''' <summary>リテラル文字列。</summary>
         Private ReadOnly _strValue As String
 
+        ''' <summary>シフトテーブル。</summary>
+        Private ReadOnly _shiftTable As SortedDictionary(Of Char, Integer)
+
         ''' <summary>評価範囲。</summary>
         Private ReadOnly _range As ExpressionRange
 
@@ -26,6 +29,23 @@ Namespace EBNF
         ''' <param name="range">評価範囲。</param>
         Public Sub New(range As ExpressionRange)
             Me._strValue = UnescapedString(range.SubRanges(0).ToString())
+            Me._shiftTable = New SortedDictionary(Of Char, Integer)()
+            For i As Integer = 0 To Me._strValue.Length - 1
+                Dim c = Me._strValue.Chars(i)
+                Dim nx = Me._strValue.Length - 1 - i
+                If Me._shiftTable.ContainsKey(c) Then
+                    Me._shiftTable(c) = nx
+                Else
+                    Me._shiftTable.Add(c, nx)
+                End If
+            Next
+
+            For Each c As Char In Me._strValue
+                If Not Me._shiftTable.ContainsKey(c) Then
+                    Me._shiftTable(c) = Me._strValue.Length
+                End If
+            Next
+
             Me._range = range
             Me.Pattern = New List(Of IAnalysis)()
         End Sub
@@ -80,35 +100,32 @@ Namespace EBNF
                               ruleTable As SortedDictionary(Of String, RuleAnalysis),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                               ruleName As String,
-                              answers As List(Of EBNFAnalysisItem)) As Boolean Implements IAnalysis.Match
+                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
             Dim subAnswers As New List(Of EBNFAnalysisItem)()
 
             ' リテラル文字列を評価
-            Dim hit = False
             Dim buffer = New Char(Me._strValue.Length - 1) {}
             Dim count = tr.Read(buffer, 0, Me._strValue.Length)
-            If EqualString(buffer, count, Me._strValue) Then
+            Dim res = EqualString(buffer, count, Me._strValue, Me._shiftTable)
+            If res.sccess Then
                 answers.Add(New EBNFAnalysisItem("literal", New List(Of EBNFAnalysisItem)(), tr, startPos, tr.Position))
-                hit = True
             End If
 
             ' 失敗情報を設定
             env.SetFailureInformation(ruleName, tr, startPos, Me._range)
 
             ' 次のパターンを評価
-            If hit Then
-                For Each evalExpr In Me.Pattern
-                    If evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers) Then
-                        Return True
-                    End If
-                Next
+            If res.sccess Then
+                res = Me.AnalysisNextPattern(tr, env, ruleTable, specialMethods, ruleName, answers)
             End If
 
-            ' どれもマッチしなかった場合は偽を返す
-            snap.Restore()
-            Return False
+            ' 解析に失敗した場合は位置を復元
+            If Not res.sccess Then
+                snap.Restore()
+            End If
+            Return res
         End Function
 
         ''' <summary>
@@ -117,17 +134,20 @@ Namespace EBNF
         ''' <param name="buffer">読み取りバッファ。</param>
         ''' <param name="count">読み取り文字数。</param>
         ''' <param name="stringValue">比較対象の文字列。</param>
+        ''' <param name="shiftTb">シフトテーブル。</param>
         ''' <returns>等しい場合は true。それ以外は false。</returns>
-        Private Shared Function EqualString(buffer() As Char, count As Integer, stringValue As String) As Boolean
-            If count <> stringValue.Length Then
-                Return False
-            End If
-            For i As Integer = 0 To stringValue.Length - 1
-                If buffer(i) <> stringValue.Chars(i) Then
-                    Return False
+        Private Shared Function EqualString(buffer() As Char,
+                                            count As Integer,
+                                            stringValue As String,
+                                            shiftTb As SortedDictionary(Of Char, Integer)) As (sccess As Boolean, shift As Integer)
+            For i As Integer = stringValue.Length - 1 To 0 Step -1
+                Dim c = buffer(i)
+                If c <> stringValue.Chars(i) Then
+                    Dim shift = If(shiftTb.ContainsKey(c), shiftTb(c), stringValue.Length)
+                    Return (False, shift)
                 End If
             Next
-            Return True
+            Return (True, 0)
         End Function
 
         ''' <summary>

@@ -45,34 +45,36 @@ Namespace EBNF
                               ruleTable As SortedDictionary(Of String, RuleAnalysis),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                               ruleName As String,
-                              answers As List(Of EBNFAnalysisItem)) As Boolean Implements IAnalysis.Match
+                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
+            ' 特殊メソッドが存在しない場合はコメント扱いで成功とする
+            If Not specialMethods.ContainsKey(Me._name) Then
+                Return (True, 0)
+            End If
+
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
             Dim subAnswers As New List(Of EBNFAnalysisItem)()
 
             ' 特殊メソッドを評価
-            Dim hit = False
-            If specialMethods.ContainsKey(Me._name) AndAlso
-               specialMethods(Me._name)(tr) Then
+            Dim res = specialMethods(Me._name)(tr)
+            If res Then
                 answers.Add(New EBNFAnalysisItem(Me._name, subAnswers, tr, startPos, tr.Position))
-                hit = True
             End If
 
             ' 失敗情報を設定
             env.SetFailureInformation(ruleName, tr, startPos, Me._range)
 
             ' 次のパターンを評価
-            If hit Then
-                For Each evalExpr In Me.Pattern
-                    If evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers) Then
-                        Return True
-                    End If
-                Next
+            Dim nextRes As (sccess As Boolean, shift As Integer) = (res, 1)
+            If res Then
+                nextRes = Me.AnalysisNextPattern(tr, env, ruleTable, specialMethods, ruleName, answers)
             End If
 
-            ' どれもマッチしなかった場合は偽を返す
-            snap.Restore()
-            Return False
+            ' 解析に失敗した場合は位置を復元
+            If Not nextRes.sccess Then
+                snap.Restore()
+            End If
+            Return nextRes
         End Function
 
         ''' <summary>

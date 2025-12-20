@@ -343,19 +343,24 @@ Namespace EBNF
                               ruleTable As SortedDictionary(Of String, RuleAnalysis),
                               specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                               ruleName As String,
-                              answers As List(Of EBNFAnalysisItem)) As Boolean Implements IAnalysis.Match
+                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
             Dim snap = tr.MemoryPosition()
 
             ' ルールパターンを順に評価
+            Dim shift As Integer = Integer.MaxValue
             For Each evalExpr In Me.Pattern
                 answers.Clear()
-                If evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers) Then
-                    Return True
+
+                Dim res = evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers)
+                If res.sccess Then
+                    Return (True, 0)
+                ElseIf res.shift < shift Then
+                    shift = res.shift
                 End If
             Next
 
             snap.Restore()
-            Return False
+            Return (False, shift)
         End Function
 
         ''' <summary>評価ノード。</summary>
