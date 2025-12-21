@@ -1,6 +1,9 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports ZoppaLibrary.ABNF.NumValExpression
+Imports ZoppaLibrary.BNF
+
 Namespace EBNF
 
     ''' <summary>
@@ -23,20 +26,67 @@ Namespace EBNF
         Public Function Match(tr As IPositionAdjustReader) As ExpressionRange Implements IExpression.Match
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
-            Dim enable = False
-
             Dim mths As New List(Of ExpressionRange)()
+
+            ' 最初のブロックにマッチするか試みる
+            Dim mth = Me.BlockMatch(tr)
+            If mth.Enable Then
+                mths.Add(mth)
+            Else
+                snap.Restore()
+                Return ExpressionRange.Invalid
+            End If
+
+
+            '// 最初の式を取得
+            'ExpressionRange concatRange = ExpressionDefines.getConcatExpr().match(accesser);
+            'If (concatRange.isEnable()) Then {
+            '    ranges.add(concatRange);
+            '}
+            'Else {
+            '    mark.restore();
+            '    Return ExpressionRange.getInvalid();
+            '}   
+
+            '// 以降の選択する式を取得
+            'While (accesser.peek()!= -1) {
+            '    IByteAccesser.IPosition nextmark = accesser.mark();
+
+            '    // コメントまたは空白
+            '    ExpressionDefines.getCommentWspExpr().match(accesser);
+
+            '    // '/' がなければ終了する
+            '    int b = accesser.peek();
+            '    If (b == '/') {
+            '        accesser.read();
+            '    }
+            '    Else {
+            '        nextmark.restore();
+            '        break;
+            '    }
+
+            '    // コメントまたは空白
+            '    ExpressionDefines.getCommentWspExpr().match(accesser);
+
+            '    // 次の式を取得
+            '    ExpressionRange nextRange = ExpressionDefines.getConcatExpr().match(accesser);
+            '    If (nextRange.isEnable()) Then {
+            '        ranges.add(nextRange);
+            '    }
+            '    Else {
+            '        nextmark.restore();
+            '        break;
+            '    }
+            '}
+
+            '// マッチ結果を返す
+            'Return New ExpressionRange(this, accesser.span(start, accesser.getPosition()), ranges);
+
+
 
             ' 1つ以上のブロックにマッチするか試みる
             Do While True
-                ' ブロックにマッチするか試みる
-                Dim mth = Me.BlockMatch(tr)
-                If Not mth.Enable Then
-                    Exit Do
-                End If
-
-                mths.Add(mth)
-                enable = True
+                Dim nextSnap = tr.MemoryPosition()
 
                 ' 縦棒があれば読み進める
                 If tr.Peek() = AscW("|") Then
@@ -44,15 +94,19 @@ Namespace EBNF
                 Else
                     Exit Do
                 End If
+
+                ' ブロックにマッチするか試みる
+                mth = Me.BlockMatch(tr)
+                If mth.Enable Then
+                    mths.Add(mth)
+                Else
+                    nextSnap.Restore()
+                    Exit Do
+                End If
             Loop
 
             ' マッチした範囲を返す
-            If enable Then
-                Return New ExpressionRange(Me, tr, startPos, tr.Position, mths.ToArray())
-            Else
-                snap.Restore()
-                Return ExpressionRange.Invalid
-            End If
+            Return New ExpressionRange(Me, tr, startPos, tr.Position, mths.ToArray())
         End Function
 
         ''' <summary>

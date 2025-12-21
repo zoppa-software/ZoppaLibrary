@@ -1,10 +1,12 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports ZoppaLibrary.BNF
+
 Namespace EBNF
 
     ''' <summary>
-    ''' 特殊シーケンス解析を表します。
+    ''' 文字列解析を表します。
     ''' </summary>
     Public NotInheritable Class TerminalAnalysis
         Implements IAnalysis

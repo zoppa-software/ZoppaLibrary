@@ -2,6 +2,7 @@
 Option Strict On
 
 Imports System.Text
+Imports ZoppaLibrary.BNF
 
 Namespace EBNF
 

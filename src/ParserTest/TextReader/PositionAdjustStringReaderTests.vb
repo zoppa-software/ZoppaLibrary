@@ -2,6 +2,7 @@ Imports System
 Imports System.IO
 Imports ZoppaLibrary.EBNF
 Imports Xunit
+Imports ZoppaLibrary.BNF
 
 
 Public Class PositionAdjustStringReaderTests

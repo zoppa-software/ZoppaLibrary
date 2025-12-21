@@ -3,6 +3,7 @@ Option Strict On
 
 Imports System.IO
 Imports System.Runtime.CompilerServices
+Imports ZoppaLibrary.BNF
 
 Namespace EBNF
 

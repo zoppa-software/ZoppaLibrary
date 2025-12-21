@@ -1,6 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
-Imports System.Transactions
+
+Imports ZoppaLibrary.BNF
 
 Namespace EBNF
 
