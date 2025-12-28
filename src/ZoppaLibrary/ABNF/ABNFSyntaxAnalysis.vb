@@ -472,7 +472,7 @@ Namespace ABNF
                 For Each kvp In Me.RuleTable
                     out.WriteLine($"ルール名: {kvp.Key}")
 
-                    Dim arrivals As New HashSet(Of IAnalysis)()
+                    Dim arrivals As New HashSet(Of RuleAnalysis)()
                     DebugRuleGraphPrint(out, arrivals, kvp.Value)
                 Next
             End Sub
@@ -483,7 +483,7 @@ Namespace ABNF
             ''' <param name="out">出力先のテキストライター。</param>
             ''' <param name="arrivals">到達済みノード集合。</param>
             ''' <param name="node">現在のノード。</param>
-            Public Sub DebugRuleGraphPrint(out As TextWriter, arrivals As HashSet(Of IAnalysis), node As IAnalysis)
+            Public Sub DebugRuleGraphPrint(out As TextWriter, arrivals As HashSet(Of RuleAnalysis), node As RuleAnalysis)
                 If Not arrivals.Contains(node) Then
                     arrivals.Add(node)
 

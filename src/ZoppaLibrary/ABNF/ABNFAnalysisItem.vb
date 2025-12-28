@@ -119,6 +119,10 @@ Namespace ABNF
             Return New ABNFAnalysisItem(ident, res, Me._tr, Me.Start, Me.End)
         End Function
 
+        ''' <summary>
+        ''' この範囲のバイト列を取得します。
+        ''' </summary>
+        ''' <returns>範囲のバイト列。</returns>
         Public Function GetBytes() As IEnumerable(Of Byte)
             Return New BytesEnumerable(Me)
         End Function
@@ -139,21 +143,37 @@ Namespace ABNF
             Return strBuilder.ToString().TrimEnd()
         End Function
 
+        ''' <summary>
+        ''' バイト列の列挙子。
+        ''' </summary>
         Public NotInheritable Class BytesEnumerable
             Implements IEnumerable(Of Byte)
 
+            ''' <summary>解析範囲。</summary>
             Private ReadOnly _owner As ABNFAnalysisItem
 
+            ''' <summary>
+            ''' コンストラクタ。
+            ''' </summary>
+            ''' <param name="owner">解析範囲。</param>
             Public Sub New(owner As ABNFAnalysisItem)
                 Me._owner = owner
             End Sub
 
+            ''' <summary>
+            ''' 列挙を取得します。
+            ''' </summary>
+            ''' <returns>列挙。</returns>
             Public Iterator Function GetEnumerator() As IEnumerator(Of Byte) Implements IEnumerable(Of Byte).GetEnumerator
                 For i As Integer = Me._owner.Start To Me._owner.End - 1
                     Yield Me._owner._tr.ReadAt(i)
                 Next
             End Function
 
+            ''' <summary>
+            ''' 列挙を取得します。
+            ''' </summary>
+            ''' <returns>列挙。</returns>
             Public Function GetEnumerator1() As IEnumerator Implements IEnumerable.GetEnumerator
                 Return GetEnumerator()
             End Function

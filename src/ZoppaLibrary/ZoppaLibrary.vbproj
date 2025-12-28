@@ -6,6 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="ABNF\Analysis\AnalysisRoute.vb" />
+    <Compile Remove="ABNF\Analysis\CharValAnalysis.vb" />
+    <Compile Remove="ABNF\Analysis\RuleNameAnalysis.vb" />
     <Compile Remove="EBNF\Analysis\AlternationCompiledExpression2.vb" />
     <Compile Remove="EBNF\Analysis\IdentifierCompiledExpression.vb" />
     <Compile Remove="EBNF\Analysis\SpecialSeqCompiledExpression.vb" />
