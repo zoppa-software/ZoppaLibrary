@@ -75,9 +75,10 @@ Namespace ABNF
         ''' マッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param
+        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="ruleName">ルール名。</param>
         ''' <returns>マッチ結果。</returns>
-        Public Overrides Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public Overrides Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
             Dim snapPos = tr.MemoryPosition()
             Dim startPos = tr.Position
 
@@ -112,6 +113,9 @@ Namespace ABNF
                         Return (True, New ABNFAnalysisItem("num-val", New List(Of ABNFAnalysisItem), tr, startPos, tr.Position))
                     End If
             End Select
+
+            ' 失敗情報を設定
+            env.SetFailureInformation(ruleName, tr, startPos, Me.Range)
 
             ' 一致しない場合は偽を返す
             snapPos.Restore()

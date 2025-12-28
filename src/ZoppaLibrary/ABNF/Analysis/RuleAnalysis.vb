@@ -13,7 +13,7 @@ Namespace ABNF
         ''' <summary>
         ''' 解析ノードのルート。
         ''' </summary>
-        Private _root As AnalysisNode
+        Private ReadOnly _root As AnalysisNode
 
         ''' <summary>
         ''' ルール名を取得する。
@@ -285,7 +285,7 @@ Namespace ABNF
         ''' </summary>
         ''' <returns>マッチャー。</returns>
         Public Function GetMatcher() As AnalysisMatcher
-            Return New AnalysisMatcher(Me._root)
+            Return New AnalysisMatcher(Me._root, Me.RuleName)
         End Function
 
         ''' <summary>

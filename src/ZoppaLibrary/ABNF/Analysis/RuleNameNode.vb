@@ -14,7 +14,7 @@ Namespace ABNF
         ''' <summary>
         ''' 位置ごとのマッチャーキャッシュ。
         ''' </summary>
-        Private _matchers As New SortedDictionary(Of Integer, AnalysisMatcher)()
+        Private ReadOnly _matchers As New SortedDictionary(Of Integer, AnalysisMatcher)()
 
         ''' <summary>
         ''' ルール名。
@@ -44,9 +44,10 @@ Namespace ABNF
         ''' マッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param
+        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="ruleName">ルール名。</param>
         ''' <returns>マッチ結果。</returns>
-        Public Overrides Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public Overrides Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
             Dim snapPos = tr.MemoryPosition()
 
             ' 現在位置のマッチャーを取得

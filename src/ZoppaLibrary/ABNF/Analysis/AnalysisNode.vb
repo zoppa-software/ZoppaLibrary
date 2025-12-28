@@ -82,12 +82,13 @@ Namespace ABNF
         End Function
 
         ''' <summary>
-        ''' 次のルートが存在するかどうかを取得する。
+        ''' マッチを試みる。
         ''' </summary>
-        ''' <param name="position">現在の位置。</param>
-        ''' <param name="route">ルート番号。</param>
-        ''' <returns>次のルートが存在する場合に True を返します。</returns>
-        Public Overridable Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+        ''' <param name="tr">位置調整バイト列。</param>
+        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="ruleName">ルール名。</param>
+        ''' <returns>マッチ結果。</returns>
+        Public Overridable Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
             Dim snapPos = tr.MemoryPosition()
 
             ' 解析を実行
@@ -103,7 +104,7 @@ Namespace ABNF
         End Function
 
         ''' <summary>
-        ''' マッチを試みる。
+        ''' 次のパターンのマッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
         ''' <param name="env">ABNF環境。</param
