@@ -8,7 +8,7 @@ Namespace ABNF
     ''' <summary>
     ''' 文字列解析を表します。
     ''' </summary>
-    Public NotInheritable Class CharValAnalysis
+    NotInheritable Class CharValAnalysis
         Implements IAnalysis
 
         ''' <summary>リテラル文字列。</summary>
@@ -23,7 +23,7 @@ Namespace ABNF
         ''' <summary>
         ''' 解析パターンを取得する。
         ''' </summary>
-        Public ReadOnly Property Pattern As List(Of IAnalysis.Link) Implements IAnalysis.Pattern
+        Public ReadOnly Property Pattern As List(Of AnalysisRoute)
 
         ''' <summary>
         ''' コンストラクタ。
@@ -49,7 +49,7 @@ Namespace ABNF
             Next
 
             Me._range = range
-            Me.Pattern = New List(Of IAnalysis.Link)()
+            Me.Pattern = New List(Of AnalysisRoute)()
         End Sub
 
         ''' <summary>
@@ -61,19 +61,21 @@ Namespace ABNF
         ''' <param name="specialMethods">特殊メソッドテーブル。</param>
         ''' <param name="ruleName">現在のルール名。</param>
         ''' <param name="answers">解析結果のリスト。</param>
+        ''' <param name="counter">訪問回数カウンター。</param>
         ''' <returns>解析が成功した場合に True を返します。</returns>
-        Public Function Match(tr As IPositionAdjustReader,
+        Public Function Match(tr As PositionAdjustBytes,
                               env As ABNFEnvironment,
                               ruleTable As SortedDictionary(Of String, RuleAnalysis),
                               ruleName As String,
-                              answers As List(Of ABNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
+                              answers As List(Of ABNFAnalysisItem),
+                              counter As Dictionary(Of IAnalysis, Integer)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
             Dim subAnswers As New List(Of ABNFAnalysisItem)()
 
             ' リテラル文字列を評価
             Dim buffer = New Char(Me._strValue.Length - 1) {}
-            Dim count = tr.Read(buffer, 0, Me._strValue.Length)
+            Dim count = 0 'tr.Read(buffer, 0, Me._strValue.Length)
             Dim res = EqualString(buffer, count, Me._strValue, Me._shiftTable)
             If res.sccess Then
                 answers.Add(New ABNFAnalysisItem("literal", New List(Of ABNFAnalysisItem)(), tr, startPos, tr.Position))
@@ -84,7 +86,7 @@ Namespace ABNF
 
             ' 次のパターンを評価
             If res.sccess Then
-                res = Me.AnalysisNextPattern(tr, env, ruleTable, ruleName, answers)
+                res = Me.AnalysisNextPattern(tr, env, ruleTable, ruleName, answers, counter)
             End If
 
             ' 解析に失敗した場合は位置を復元

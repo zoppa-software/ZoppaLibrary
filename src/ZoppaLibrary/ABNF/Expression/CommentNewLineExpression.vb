@@ -28,10 +28,8 @@ Namespace ABNF
             ' コメントを読み飛ばす
             Dim commentRange = ABNFCommentExpr().Match(tr)
             If commentRange.Enable Then
-                Dim crlfRange = ABNFCrLfExpr().Match(tr)
-                If crlfRange.Enable Then
-                    Return commentRange
-                End If
+                ABNFCrLfExpr().Match(tr)
+                Return commentRange
             End If
 
             ' 失敗

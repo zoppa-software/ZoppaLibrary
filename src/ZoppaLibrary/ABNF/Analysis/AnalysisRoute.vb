@@ -6,36 +6,40 @@ Imports ZoppaLibrary.BNF
 Namespace ABNF
 
     ''' <summary>
-    ''' 端点解析（完了）を表します。
+    ''' 解析ルートを表します。
     ''' </summary>
-    NotInheritable Class CompletedAnalysis
+    Public NotInheritable Class AnalysisRoute
         Implements IAnalysis
 
-        ''' <summary>シングルトンインスタンス。</summary>
-        Private Shared _singleton As New Lazy(Of CompletedAnalysis)(
-            Function() New CompletedAnalysis()
-        )
+        ''' <summary>到達先解析ノード。</summary>
+        Public ReadOnly Property ToAnalysis As IAnalysis
 
-        ''' <summary>
-        ''' シングルトンインスタンスを取得する。
-        ''' </summary>
-        ''' <returns>シングルトンインスタンス。</returns>
-        Public Shared Function Instance() As CompletedAnalysis
-            Return _singleton.Value
-        End Function
+        ''' <summary>最小出現回数。</summary>
+        Public ReadOnly Property MinLimit As Integer
 
-        ' 空のパターンリストを共有
-        Private _empty As New List(Of AnalysisRoute)()
+        ''' <summary>最大出現回数。</summary>
+        Public ReadOnly Property MaxLimit As Integer
 
         ''' <summary>
         ''' 解析パターンを取得する。
         ''' </summary>
-        ''' <returns>解析パターン。</returns>
         Public ReadOnly Property Pattern As List(Of AnalysisRoute)
             Get
-                Return _empty
+                Return Nothing
             End Get
         End Property
+
+        ''' <summary>
+        ''' コンストラクタ。
+        ''' </summary>
+        ''' <param name="toNode">到達先解析ノード。</param>
+        ''' <param name="minLimit">最小出現回数。</param>
+        ''' <param name="maxLimit">最大出現回数。</param>
+        Public Sub New(toNode As IAnalysis, minLimit As Integer, maxLimit As Integer)
+            Me.ToAnalysis = toNode
+            Me.MinLimit = minLimit
+            Me.MaxLimit = maxLimit
+        End Sub
 
         ''' <summary>
         ''' 解析を実行する。
@@ -53,7 +57,7 @@ Namespace ABNF
                               ruleName As String,
                               answers As List(Of ABNFAnalysisItem),
                               counter As Dictionary(Of IAnalysis, Integer)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
-            Return (True, 0)
+            Return Me.ToAnalysis.Match(tr, env, ruleTable, ruleName, answers, counter)
         End Function
 
         ''' <summary>
@@ -61,7 +65,7 @@ Namespace ABNF
         ''' </summary>
         ''' <returns>文字列表現。</returns>
         Public Overrides Function ToString() As String
-            Return "<終了>"
+            Return $"Min:{Me.MinLimit}, Max:{Me.MaxLimit} -> {Me.ToAnalysis.ToString()}"
         End Function
 
     End Class

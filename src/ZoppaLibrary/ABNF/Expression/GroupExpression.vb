@@ -38,6 +38,8 @@ Namespace ABNF
 
             ' 空白読み捨て
             ABNFCommentWspExpr.Match(tr)
+            ABNFCrLfExpr.Match(tr)
+            ABNFSpaceExpr.Match(tr)
 
             ' 選択式をマッチングする
             Dim alterRange = ABNFAlterExpr().Match(tr)

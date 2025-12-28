@@ -38,17 +38,14 @@ Namespace ABNF
                         lists.Add(key, ruleRange)
                     ElseIf ruleRange.SubRanges.Count > 2 AndAlso
                            lists(key).SubRanges.Count = 2 Then
-                        lists(key).GetRange(1).AddSubRanges(ruleRange.GetRange(2).SubRanges)
+                        lists(key).SubRanges(1).AddSubRanges(ruleRange.SubRanges(2).SubRanges)
                     End If
                 Else
                     ' SP / HTAB をスキップする
                     ABNFSpaceExpr.Match(tr)
 
                     ' コメント式をマッチングする
-                    Dim commentRange = ABNFCommentNlExpr.Match(tr)
-                    If commentRange.Enable Then
-                        ranges.Add(commentRange)
-                    End If
+                    ABNFCommentNlExpr.Match(tr)
                 End If
 
                 ' 改行のみが続く場合はスキップする

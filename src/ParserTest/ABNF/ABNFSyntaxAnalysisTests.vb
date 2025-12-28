@@ -133,10 +133,12 @@ rule3 = ""third""")
     <Fact>
     Public Sub CompileEnvironment_ComplexRule_CreatesCorrectStructure()
         ' Arrange: 複雑なABNFルールを作成
-        Dim ruleText = New PositionAdjustString(
+        Dim input = "" &
 "uri = scheme "":"" hier-part [ ""?"" query ] [ ""#"" fragment ]
 scheme = ALPHA *( ALPHA / DIGIT / ""+"" / ""-"" / ""."" )
-query = *( pchar / ""/"" / ""?"" )")
+query = *( pchar / ""/"" / ""?"" )"
+        Dim ruleText = New PositionAdjustString(input)
+        Dim cs = input.ToCharArray()
 
         ' Act: CompileEnvironmentを実行
         Dim environment = ABNFSyntaxAnalysis.CompileEnvironment(ruleText)
@@ -152,6 +154,101 @@ query = *( pchar / ""/"" / ""?"" )")
         Assert.Equal("uri", environment.RuleTable("uri").RuleName)
         Assert.Equal("scheme", environment.RuleTable("scheme").RuleName)
         Assert.Equal("query", environment.RuleTable("query").RuleName)
+    End Sub
+
+    <Fact>
+    Public Sub CompileEnvironment_Grammar1()
+        ' Arrange: 複雑なABNFルールを作成
+        Dim input = "" &
+"unescaped = %x20-21 / %x23-5B / %x5D-10FFFF
+
+; Whitespace
+ws = *(%x20 /             ; Space
+       %x09 /             ; Horizontal tab
+       %x0A /             ; Line feed or New line
+       %x0D               ; Carriage return
+     )
+
+; Range
+num = %x00-01
+num-range = <num> <ws> <num>"
+        Dim ruleText = New PositionAdjustString(input)
+        Dim cs = input.ToCharArray()
+
+        ' Act: CompileEnvironmentを実行
+        Dim environment = ABNFSyntaxAnalysis.CompileEnvironment(ruleText)
+    End Sub
+
+    <Fact>
+    Public Sub CompileEnvironment_Grammar2()
+        ' Arrange: 複雑なABNFルールを作成
+        Dim input = "" &
+"postal-address   = name-part street zip-part
+
+name-part        = *(personal-part SP) last-name [SP suffix] CRLF
+name-part        =/ personal-part CRLF
+
+personal-part    = first-name / (initial ""."")
+first-name       = *ALPHA
+initial          = ALPHA
+last-name        = *ALPHA
+suffix           = (""Jr."" / ""Sr."" / 1*(""I"" / ""V"" / ""X""))
+
+street           = [apt SP] house-num SP street-name CRLF
+apt              = 1*4DIGIT
+house-num        = 1*8(DIGIT / ALPHA)
+street-name      = 1*VCHAR
+
+zip-part         = town-name "","" SP state 1*2SP zip-code CRLF
+town-name        = 1*(ALPHA / SP)
+state            = 2ALPHA
+zip-code         = 5DIGIT [""-"" 4DIGIT]"
+        Dim ruleText = New PositionAdjustString(input)
+        Dim cs = input.ToCharArray()
+
+        ' Act: CompileEnvironmentを実行
+        Dim environment = ABNFSyntaxAnalysis.CompileEnvironment(ruleText)
+    End Sub
+
+    <Fact>
+    Public Sub CompileEnvironment_Grammar3()
+        ' Arrange: 複雑なABNFルールを作成
+        Dim input = "" &
+"tell = *num [""-""] 3*4num [""-""] 4num
+tell2 = area [""-""] in-area-code [""-""] subscriber
+tell3 = area in-area-code
+num = %x30-39
+area = *num
+in-area-code = 3*4num
+subscriber = 4num"
+        Dim ruleText = New PositionAdjustString(input)
+        Dim cs = input.ToCharArray()
+
+        ' Act: CompileEnvironmentを実行
+        Dim env = ABNFSyntaxAnalysis.CompileEnvironment(ruleText)
+
+        Dim ans2 = env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("123-456-7890")))
+
+        Dim ans1 = env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12345678901")))
+
+        Dim ans4 = env.Evaluate("tell2", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12345678901")))
+        Assert.Equal(New Byte() {&H31, &H32, &H33, &H34}, ans4("area").GetBytes())
+        Assert.Equal(New Byte() {&H35, &H36, &H37}, ans4("in-area-code").GetBytes())
+        Assert.Equal(New Byte() {&H38, &H39, &H30, &H31}, ans4("subscriber").GetBytes())
+
+        Dim ans3 = env.Evaluate("tell3", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("123")))
+
+        Assert.Throws(Of ABNFException)(
+            Sub()
+                env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12-34565-7890")))
+            End Sub
+        )
+
+        Assert.Throws(Of ABNFException)(
+            Sub()
+                env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("1234-56-7890")))
+            End Sub
+        )
     End Sub
 
 End Class

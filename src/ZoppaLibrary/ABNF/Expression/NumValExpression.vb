@@ -28,7 +28,6 @@ Namespace ABNF
         Public Function Match(tr As IPositionAdjustReader) As ExpressionRange Implements IExpression.Match
             Dim snap = tr.MemoryPosition()
             Dim startPos = tr.Position
-            Dim mths As New List(Of ExpressionRange)()
 
             ' 開始文字は "%"
             If tr.Peek() = AscW("%"c) Then
@@ -64,8 +63,7 @@ Namespace ABNF
 
             ' マッチ結果を返す
             If expr.Enable Then
-                mths.Add(expr)
-                Return New ExpressionRange(Me, tr, startPos, tr.Position, mths.ToArray())
+                Return expr
             Else
                 snap.Restore()
                 Return ExpressionRange.Invalid
@@ -82,7 +80,7 @@ Namespace ABNF
         ''' </returns>
         Private Function MatchValue(tr As IPositionAdjustReader, numbers() As Integer) As ExpressionRange
             Dim startPos = tr.Position
-            Dim mths As New List(Of ExpressionRange)()
+            Dim ranges As New List(Of ExpressionRange)()
 
             ' b / d / x を読み飛ばす
             tr.Read()
@@ -110,10 +108,11 @@ Namespace ABNF
 
             ' 連結または範囲指定の取得
             If enabled Then
-                mths.Add(New ExpressionRange(Me, tr, fst, tr.Position, ExpressionRange.EmptyRanges))
-
                 Select Case tr.Peek()
                     Case AscW("."c)
+                        ranges.Add(New ExpressionRange(ABNFNumValConcatExpr,
+                                                     tr, fst, tr.Position, ExpressionRange.EmptyRanges))
+
                         ' 連結取得
                         tr.Read()
 
@@ -132,7 +131,8 @@ Namespace ABNF
                                 End If
                             Loop
                             If nena Then
-                                mths.Add(New ExpressionRange(ABNFNumValRangeExpr, tr, nst, tr.Position, ExpressionRange.EmptyRanges))
+                                ranges.Add(New ExpressionRange(ABNFNumValConcatExpr,
+                                                             tr, nst, tr.Position, ExpressionRange.EmptyRanges))
                             End If
 
                             ' 次のピリオドを確認
@@ -144,6 +144,9 @@ Namespace ABNF
                         Loop
 
                     Case AscW("-"c)
+                        ranges.Add(New ExpressionRange(ABNFNumValRangeExpr,
+                                                     tr, fst, tr.Position, ExpressionRange.EmptyRanges))
+
                         ' 範囲取得
                         tr.Read()
 
@@ -161,15 +164,20 @@ Namespace ABNF
                             End If
                         Loop
                         If nena Then
-                            mths.Add(New ExpressionRange(ABNFNumValConcatExpr, tr, nst, tr.Position, ExpressionRange.EmptyRanges))
+                            ranges.Add(New ExpressionRange(ABNFNumValRangeExpr,
+                                                         tr, nst, tr.Position, ExpressionRange.EmptyRanges))
                         End If
+
+                    Case Else
+                        ' 連結・範囲指定なし
+                        ranges.Add(New ExpressionRange(Me, tr, fst, tr.Position, ExpressionRange.EmptyRanges))
                 End Select
             End If
 
             ' マッチ結果を返す
             Return If(
                 enabled,
-                New ExpressionRange(Me, tr, startPos, tr.Position, mths.ToArray()),
+                New ExpressionRange(Me, tr, startPos, tr.Position, ranges.ToArray()),
                 ExpressionRange.Invalid
             )
         End Function

@@ -131,18 +131,6 @@ Namespace BNF
         End Function
 
         ''' <summary>
-        ''' 指定されたインデックスのサブレンジを取得します。
-        ''' </summary>
-        ''' <param name="index">インデックス（0 ベース）。</param>
-        ''' <returns>指定されたインデックスのサブレンジ。</returns>
-        ''' <exception cref="ArgumentOutOfRangeException">
-        ''' index が範囲外の場合にスローされます。
-        ''' </exception>
-        Public Function GetRange(index As Integer) As ExpressionRange
-            Return Me.SubRanges.ToArray()(index)
-        End Function
-
-        ''' <summary>
         ''' サブレンジにリストを追加します。
         ''' </summary>
         ''' <param name="subRanges">追加するサブレンジの列挙。</param>

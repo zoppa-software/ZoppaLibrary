@@ -23,16 +23,14 @@ Namespace ABNF
         ''' マッチした場合は開始位置と終了位置を持つ <see cref="ExpressionRange"/>。失敗時は <see cref="ExpressionRange.Invalid"/>.
         ''' </returns>
         Public Function Match(tr As IPositionAdjustReader) As ExpressionRange Implements IExpression.Match
-            Dim c = tr.Peek()
-            If c = AscW(" "c) OrElse c = AscW(vbTab) Then
-                ' WSPにマッチする場合はそちらを優先
-                Return ABNFSpaceExpr().Match(tr)
-            Else
-                ' コメントと空白の組み合わせを試す
-                Dim comment = ABNFCommentNlExpr().Match(tr)
-                ABNFSpaceExpr().Match(tr)
+            ' コメントと空白の組み合わせを試す
+            ABNFSpaceExpr().Match(tr)
+            Dim comment = ABNFCommentNlExpr().Match(tr)
+            ABNFSpaceExpr().Match(tr)
+            If comment.Enable Then
                 Return comment
             End If
+            Return ExpressionRange.Invalid
         End Function
 
     End Class

@@ -53,6 +53,8 @@ Namespace ABNF
 
                 ' コメントまたは空白
                 ABNFCommentWspExpr().Match(tr)
+                ABNFCrLfExpr().Match(tr)
+                ABNFCommentWspExpr().Match(tr)
 
                 ' 次の式を取得
                 concatRange = ABNFConcatExpr().Match(tr)

@@ -70,6 +70,7 @@ Namespace ABNF
             Loop
             If fena Then
                 ranges(0) = New ExpressionRange(Me, tr, first, tr.Position, ExpressionRange.EmptyRanges)
+                ranges(1) = ranges(0)
             End If
 
             ' "*" があれば読み進める
@@ -111,31 +112,37 @@ Namespace ABNF
         ''' <param name="tr">入力ソースを表す <see cref="IPositionAdjustReader"/>。</param>
         ''' <returns>マッチした式。</returns>
         Private Function SelectExpression(tr As IPositionAdjustReader) As ExpressionRange
+            ' ルール名
             Dim expr = ABNFRuleNameExpr.Match(tr)
             If expr.Enable Then
                 Return expr
             End If
 
+            ' グループ
             expr = ABNFGroupExpr().Match(tr)
             If expr.Enable Then
                 Return expr
             End If
 
+            ' オプション
             expr = ABNFOptionExpr().Match(tr)
             If expr.Enable Then
                 Return expr
             End If
 
+            ' 文字値
             expr = ABNFCharValExpr.Match(tr)
             If expr.Enable Then
                 Return expr
             End If
 
+            ' 数値値
             expr = ABNFNumValExpr.Match(tr)
             If expr.Enable Then
                 Return expr
             End If
 
+            ' 散文値
             expr = ABNFProseValExpr.Match(tr)
             If expr.Enable Then
                 Return expr

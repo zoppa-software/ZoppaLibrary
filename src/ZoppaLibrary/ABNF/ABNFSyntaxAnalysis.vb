@@ -5,6 +5,8 @@ Imports System.IO
 Imports System.Net.Sockets
 Imports System.Runtime.CompilerServices
 Imports ZoppaLibrary.BNF
+Imports ZoppaLibrary.EBNF
+Imports ZoppaLibrary.EBNF.EBNFSyntaxAnalysis
 Imports ZoppaLibrary.Strings
 
 Namespace ABNF
@@ -29,7 +31,6 @@ Namespace ABNF
             Return answerEnv
         End Function
 
-
         ''' <summary>
         ''' ルールテーブルを作成します。
         ''' </summary>
@@ -44,6 +45,33 @@ Namespace ABNF
                 End If
             Next
             Return ruleTable
+        End Function
+
+        <Extension()>
+        Public Function Evaluate(env As ABNFEnvironment, ident As String, target As PositionAdjustBytes) As ABNFAnalysisItem
+            If env.RuleTable.ContainsKey(ident) Then
+                Dim startPos = target.Position
+                Dim iter = env.RuleTable(ident).GetMatcher()
+                Dim res = iter.MoveNext(target, env)
+                If res.success AndAlso target.Peek() = -1 Then
+                    env.Answer = New ABNFAnalysisItem(ident, iter.GetAnswer(), target, startPos, target.Position)
+                    Return env.Answer
+                End If
+                'Dim startPos = target.Position
+                'Dim answers As New List(Of ABNFAnalysisItem)()
+
+                '' 解析実行
+                'Dim res = env.RuleTable(ident).Match(target, env, env.RuleTable, ident, answers, New Dictionary(Of IAnalysis, Integer)())
+
+                '' 解析でき、かつ全て消費した場合は成功
+                'If res.sccess AndAlso target.Peek() = -1 Then
+                '    env.Answer = New ABNFAnalysisItem(ident, answers, target, startPos, target.Position)
+                '    Return env.Answer
+                'End If
+                'env.ThrowFailureException(ident)
+                Throw New ABNFException("解析失敗")
+            End If
+            Throw New ABNFException($"指定された識別子 '{ident}' はルールに存在しません。")
         End Function
 
 #Region "特殊メソッド"
@@ -348,7 +376,7 @@ Namespace ABNF
             ''' <summary>
             ''' 解析失敗情報：失敗した位置調整リーダー。
             ''' </summary>
-            Private _failTr As IPositionAdjustReader = Nothing
+            Private _failTr As PositionAdjustBytes = Nothing
 
             ''' <summary>
             ''' 解析失敗情報：失敗した位置。
@@ -417,7 +445,7 @@ Namespace ABNF
             ''' <param name="failPos">失敗した位置。</param>
             ''' <param name="failRange">失敗した評価範囲。</param>
             Public Sub SetFailureInformation(failRuleName As String,
-                                             failTr As IPositionAdjustReader,
+                                             failTr As PositionAdjustBytes,
                                              failPos As Integer,
                                              failRange As ExpressionRange)
                 Me._failRuleName = failRuleName
@@ -431,7 +459,8 @@ Namespace ABNF
             ''' </summary>
             ''' <param name="ident">失敗した識別子。</param>
             Public Sub ThrowFailureException(ident As String)
-                Throw New ABNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}, 文字列: {Me._failTr.Substring(Me._failPos)}")
+                'Throw New ABNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}, 文字列: {Me._failTr.Substring(Me._failPos)}")
+                Throw New ABNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}")
             End Sub
 
             ''' <summary>
@@ -458,18 +487,18 @@ Namespace ABNF
                 If Not arrivals.Contains(node) Then
                     arrivals.Add(node)
 
-                    out.Write($"node:{node} -> ")
-                    For Each nextNode In node.Pattern
-                        out.Write($"{nextNode}, ")
-                    Next
-                    out.WriteLine()
+                    'out.Write($"node:{node} -> ")
+                    'For Each nextNode In node.Pattern
+                    '    out.Write($"{nextNode}, ")
+                    'Next
+                    'out.WriteLine()
 
-                    For Each nextNode In node.Pattern
-                        If TypeOf nextNode.ToAnalysis Is CompletedAnalysis Then
-                            Continue For
-                        End If
-                        DebugRuleGraphPrint(out, arrivals, nextNode.ToAnalysis)
-                    Next
+                    'For Each nextNode In node.Pattern
+                    '    If TypeOf nextNode.ToAnalysis Is CompletedAnalysis Then
+                    '        Continue For
+                    '    End If
+                    '    DebugRuleGraphPrint(out, arrivals, nextNode.ToAnalysis)
+                    'Next
                 End If
             End Sub
 

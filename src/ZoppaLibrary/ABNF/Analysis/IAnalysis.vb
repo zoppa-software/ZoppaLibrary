@@ -11,11 +11,6 @@ Namespace ABNF
     Public Interface IAnalysis
 
         ''' <summary>
-        ''' 解析パターンを取得する。
-        ''' </summary>
-        ReadOnly Property Pattern As List(Of Link)
-
-        ''' <summary>
         ''' 解析を実行する。
         ''' </summary>
         ''' <param name="tr">位置調整リーダー。入力ストリームの現在位置を管理します。</param>
@@ -23,28 +18,14 @@ Namespace ABNF
         ''' <param name="ruleTable">ルール名とその解析ロジックのマッピング。</param>
         ''' <param name="ruleName">現在評価中のルール名。デバッグ用。</param>
         ''' <param name="answers">解析結果を格納するリスト。マッチした要素が追加されます。</param>
+        ''' <param name="counter">訪問回数を示すカウンター。</param>
         ''' <returns>解析が成功した場合に True を返します。</returns>
-        Function Match(tr As IPositionAdjustReader,
+        Function Match(tr As PositionAdjustBytes,
                        env As ABNFEnvironment,
                        ruleTable As SortedDictionary(Of String, RuleAnalysis),
                        ruleName As String,
-                       answers As List(Of ABNFAnalysisItem)) As (sccess As Boolean, shift As Integer)
-
-        Structure Link
-
-            Public ReadOnly Property ToAnalysis As IAnalysis
-
-            Public ReadOnly Property MinLimit As Integer
-
-            Public ReadOnly Property MaxLimit As Integer
-
-            Public Sub New(toNode As IAnalysis, minLimit As Integer, maxLimit As Integer)
-                Me.ToAnalysis = toNode
-                Me.MinLimit = minLimit
-                Me.MaxLimit = maxLimit
-            End Sub
-
-        End Structure
+                       answers As List(Of ABNFAnalysisItem),
+                       counter As Dictionary(Of IAnalysis, Integer)) As (sccess As Boolean, shift As Integer)
 
     End Interface
 

@@ -2,9 +2,13 @@
 Option Strict On
 
 Imports ZoppaLibrary.BNF
+Imports ZoppaLibrary.EBNF
 
 Namespace ABNF
 
+    ''' <summary>
+    ''' ルール名解析を表します。
+    ''' </summary>
     NotInheritable Class RuleNameAnalysis
         Implements IAnalysis
 
@@ -14,7 +18,10 @@ Namespace ABNF
         ''' <summary>評価範囲。</summary>
         Private ReadOnly _range As ExpressionRange
 
-        Public ReadOnly Property Pattern As List(Of IAnalysis.Link) Implements IAnalysis.Pattern
+        ''' <summary>
+        ''' 解析パターンを取得する。
+        ''' </summary>
+        Public ReadOnly Property Pattern As List(Of AnalysisRoute)
 
         ''' <summary>
         ''' コンストラクタ。
@@ -23,11 +30,53 @@ Namespace ABNF
         Public Sub New(range As ExpressionRange)
             Me._name = range.ToString()
             Me._range = range
-            Me.Pattern = New List(Of IAnalysis.Link)()
+            Me.Pattern = New List(Of AnalysisRoute)()
         End Sub
 
-        Public Function Match(tr As IPositionAdjustReader, env As ABNFEnvironment, ruleTable As SortedDictionary(Of String, RuleAnalysis), ruleName As String, answers As List(Of ABNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
-            Throw New NotImplementedException()
+        ''' <summary>
+        ''' 解析を実行する。
+        ''' </summary>
+        ''' <param name="tr">位置調整リーダー。</param>
+        ''' <param name="env">解析環境。</param>
+        ''' <param name="ruleTable">ルール解析テーブル。</param>
+        ''' <param name="ruleName">現在のルール名。</param>
+        ''' <param name="answers">解析結果のリスト。</param>
+        ''' <param name="counter">訪問回数カウンター。</param>
+        ''' <returns>解析が成功した場合に True を返します。</returns>
+        Public Function Match(tr As PositionAdjustBytes,
+                              env As ABNFEnvironment,
+                              ruleTable As SortedDictionary(Of String, RuleAnalysis),
+                              ruleName As String,
+                              answers As List(Of ABNFAnalysisItem),
+                              counter As Dictionary(Of IAnalysis, Integer)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
+            ' ルール名に対応するルールが存在しない場合は例外をスロー
+            If Not ruleTable.ContainsKey(Me._name) Then
+                Throw New KeyNotFoundException($"ルール名 '{Me._name}' はルールテーブルに存在しません。")
+            End If
+
+            Dim snap = tr.MemoryPosition()
+            Dim startPos = tr.Position
+            Dim subAnswers As New List(Of ABNFAnalysisItem)()
+
+            ' ルール名に対応するルールを評価
+            Dim res = ruleTable(Me._name).Match(tr, env, ruleTable, ruleName, subAnswers, New Dictionary(Of IAnalysis, Integer)())
+            If res.sccess Then
+                answers.Add(New ABNFAnalysisItem(Me._name, subAnswers, tr, startPos, tr.Position))
+            End If
+
+            ' 失敗情報を設定
+            env.SetFailureInformation(ruleName, tr, startPos, Me._range)
+
+            ' 次のパターンを評価
+            If res.sccess Then
+                res = Me.AnalysisNextPattern(tr, env, ruleTable, ruleName, answers, counter)
+            End If
+
+            ' どれもマッチしなかった場合は偽を返す
+            If Not res.sccess Then
+                snap.Restore()
+            End If
+            Return res
         End Function
 
         ''' <summary>

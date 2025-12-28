@@ -23,7 +23,7 @@ Namespace ABNF
         ''' <summary>
         ''' 位置調整リーダーを取得します。
         ''' </summary>
-        Private _tr As IPositionAdjustReader
+        Private _tr As PositionAdjustBytes
 
         ''' <summary>
         ''' 範囲の開始位置（0 ベースのインデックス）を取得します。
@@ -94,7 +94,7 @@ Namespace ABNF
         ''' <param name="endPos">範囲の終了位置。</param>
         Public Sub New(ident As String,
                        answers As List(Of ABNFAnalysisItem),
-                       tr As IPositionAdjustReader,
+                       tr As PositionAdjustBytes,
                        startPos As Integer,
                        endPos As Integer)
             Me.Identifier = ident
@@ -119,13 +119,45 @@ Namespace ABNF
             Return New ABNFAnalysisItem(ident, res, Me._tr, Me.Start, Me.End)
         End Function
 
+        Public Function GetBytes() As IEnumerable(Of Byte)
+            Return New BytesEnumerable(Me)
+        End Function
+
         ''' <summary>
         ''' この範囲の文字列を取得します。
         ''' </summary>
         ''' <returns>範囲の文字列。</returns>
         Public Overrides Function ToString() As String
-            Return $"{Me._tr.Substring(Me.Start, Me.End - Me.Start)}"
+            Dim buf = New Byte(Me.End - Me.Start - 1) {}
+            Me._tr.Read(buf, Me.Start, 0, buf.Length)
+
+            Dim strBuilder As New System.Text.StringBuilder()
+            For Each b As Byte In buf
+                strBuilder.Append(String.Format("{0:X2}({1}) ", b, If(b >= &H20 AndAlso b <= &H7E, ChrW(b), " "c)))
+            Next
+
+            Return strBuilder.ToString().TrimEnd()
         End Function
+
+        Public NotInheritable Class BytesEnumerable
+            Implements IEnumerable(Of Byte)
+
+            Private ReadOnly _owner As ABNFAnalysisItem
+
+            Public Sub New(owner As ABNFAnalysisItem)
+                Me._owner = owner
+            End Sub
+
+            Public Iterator Function GetEnumerator() As IEnumerator(Of Byte) Implements IEnumerable(Of Byte).GetEnumerator
+                For i As Integer = Me._owner.Start To Me._owner.End - 1
+                    Yield Me._owner._tr.ReadAt(i)
+                Next
+            End Function
+
+            Public Function GetEnumerator1() As IEnumerator Implements IEnumerable.GetEnumerator
+                Return GetEnumerator()
+            End Function
+        End Class
 
     End Class
 
