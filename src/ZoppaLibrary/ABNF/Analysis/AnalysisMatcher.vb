@@ -151,28 +151,25 @@ Namespace ABNF
                     ' 対象ノードが一致するか判定
                     Dim matched = nextNode.Match(tr, env, Me._ruleName)
                     If matched.success Then
+                        ' 次のノードへ進む
+                        Me._stack.Push(New StackState(node, nextNode, route, currentPosition, tr.Position, matched.answer))
+                        Me.IncrementArrived(nextNode.Id)
+
                         ' 最終ノードに到達した場合は成功
                         If nextNode.Routes.Count = 0 Then
                             Return (True, 0)
                         End If
 
                         ' 次のノードへ進む
-                        Me._stack.Push(New StackState(node, nextNode, route, currentPosition, tr.Position, matched.answer))
                         currentPosition = tr.Position
                         node = nextNode
                         route = 0
-                        Me.IncrementArrived(nextNode.Id)
                     Else
                         ' ノードが一致しなかった場合は次のルートへ
                         route += 1
                         tr.Seek(currentPosition)
                     End If
                 Loop
-
-                ' 最終ノードに到達した場合は成功
-                If node.Routes.Count = 0 Then
-                    Return (True, 0)
-                End If
 
                 ' 全てのルートを試行しても一致しない場合はノードを遡る
                 Do
@@ -299,12 +296,16 @@ Namespace ABNF
             Return res
         End Function
 
+        Friend Sub ClearCache()
+            Dim idHash As New HashSet(Of Integer)()
+            Me._root.ClearCache(idHash)
+        End Sub
+
         Private Structure StackState
             Public ReadOnly Property FromNode As AnalysisNode
             Public ReadOnly Property ToNode As AnalysisNode
             Public ReadOnly Property Route As Integer
             Public ReadOnly Property StartPosition As Integer
-            Public ReadOnly Property EndPosition As Integer
             Public ReadOnly Property Answer As ABNFAnalysisItem
             Public Sub New(fromNode As AnalysisNode,
                            toNode As AnalysisNode,
@@ -316,11 +317,10 @@ Namespace ABNF
                 Me.ToNode = toNode
                 Me.Route = route
                 Me.StartPosition = startPosition
-                Me.EndPosition = endPosition
                 Me.Answer = answer
             End Sub
             Overrides Function ToString() As String
-                Return $"From:{Me.FromNode.Id}, To:{Me.ToNode.Id}, Route:{Me.Route}, Start:{Me.StartPosition}, End:{Me.EndPosition}"
+                Return $"From:{Me.FromNode.Id}, To:{Me.ToNode.Id}, Route:{Me.Route}, Start:{Me.StartPosition}"
             End Function
         End Structure
 

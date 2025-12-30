@@ -27,7 +27,7 @@ Namespace ABNF
 
         ''' <summary>
         ''' 再試行可能かを取得する。
-        ''' </summary
+        ''' </summary>
         Public Overrides ReadOnly Property IsRetry As Boolean
             Get
                 Return True

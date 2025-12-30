@@ -107,23 +107,15 @@ Namespace ABNF
         End Sub
 
         ''' <summary>
-        ''' 次のルートが存在するかどうかを取得する。
-        ''' </summary>
-        ''' <param name="position">現在の位置。</param>
-        ''' <param name="route">ルート番号。</param>
-        ''' <returns>次のルートが存在する場合に True を返します。</returns>
-        Public Function HasNext(position As Integer, route As Integer) As Boolean
-            Return route < Me.Routes.Count
-        End Function
-
-        ''' <summary>
         ''' マッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
         ''' <param name="env">ABNF環境。</param>
         ''' <param name="ruleName">ルール名。</param>
         ''' <returns>マッチ結果。</returns>
-        Public Overridable Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public Overridable Function Match(tr As PositionAdjustBytes,
+                                          env As ABNFEnvironment,
+                                          ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
             Return (True, Nothing)
         End Function
 
@@ -133,7 +125,8 @@ Namespace ABNF
         ''' <param name="tr">位置調整バイト列。</param>
         ''' <param name="env">ABNF環境。</param
         ''' <returns>マッチ結果。</returns>
-        Public Overridable Function MoveNext(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, isRetry As Boolean, answer As ABNFAnalysisItem)
+        Public Overridable Function MoveNext(tr As PositionAdjustBytes,
+                                             env As ABNFEnvironment) As (success As Boolean, isRetry As Boolean, answer As ABNFAnalysisItem)
             Return (False, False, Nothing)
         End Function
 

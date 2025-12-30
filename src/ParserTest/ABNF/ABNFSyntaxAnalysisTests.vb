@@ -227,14 +227,14 @@ subscriber = 4num"
         ' Act: CompileEnvironmentを実行
         Dim env = ABNFSyntaxAnalysis.CompileEnvironment(ruleText)
 
+        Dim ans1 = env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12345678901")))
+
+        Dim ans2 = env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("123-456-7890")))
+
         Dim ans4 = env.Evaluate("tell2", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12345678901")))
         Assert.Equal(New Byte() {&H31, &H32, &H33, &H34}, ans4("area").GetBytes())
         Assert.Equal(New Byte() {&H35, &H36, &H37}, ans4("in-area-code").GetBytes())
         Assert.Equal(New Byte() {&H38, &H39, &H30, &H31}, ans4("subscriber").GetBytes())
-
-        Dim ans2 = env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("123-456-7890")))
-
-        Dim ans1 = env.Evaluate("tell", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12345678901")))
 
         Dim ans3 = env.Evaluate("tell3", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("123")))
 
@@ -259,10 +259,6 @@ subscriber = 4num"
 
         Dim ans2 = env.Evaluate("repeat-rule", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12")))
         Assert.Equal(New Byte() {&H31, &H32}, ans2.GetBytes())
-
-
-
-
 
         Assert.Throws(Of ABNFException)(
             Sub()

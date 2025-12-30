@@ -55,7 +55,7 @@ Namespace ABNF
                 Dim matcher = env.RuleTable(ident).GetMatcher()
 
                 ' 解析実行
-                env.ClearCache()
+                matcher.ClearCache()
                 Do While target.Peek() <> -1
                     Dim res = matcher.MoveNext(target, env)
 
