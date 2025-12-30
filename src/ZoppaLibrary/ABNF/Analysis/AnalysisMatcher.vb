@@ -1,10 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
 
-Imports System.Text.RegularExpressions
-Imports ZoppaLibrary.ABNF.AnalysisNode
 Imports ZoppaLibrary.BNF
-Imports ZoppaLibrary.EBNF
 
 Namespace ABNF
 
@@ -12,6 +9,7 @@ Namespace ABNF
     ''' ABNF 解析マッチャー。
     ''' </summary>
     Public NotInheritable Class AnalysisMatcher
+        Implements IAnalysisMatcher
 
         ''' <summary>最大反復回数。</summary>
         Private Const MaxIterations As Integer = 10000
@@ -64,7 +62,7 @@ Namespace ABNF
         ''' <param name="env">解析環境。</param>
         ''' <returns>解析が成功した場合に True を返します。</returns>
         Public Function Match(tr As PositionAdjustBytes,
-                              env As ABNFEnvironment) As (success As Boolean, shift As Integer)
+                              env As ABNFEnvironment) As (success As Boolean, shift As Integer) Implements IAnalysisMatcher.Match
             If Me._stack.Count = 0 Then
                 ' 初回開始
                 Me._arrived.Clear()
@@ -75,7 +73,7 @@ Namespace ABNF
                 Dim cur = Me._stack.Pop()
                 Me.DecrementArrived(cur.ToNode.Id)
                 tr.Seek(cur.StartPosition)
-                Return Me.Tracking(cur.ToNode, cur.Route, tr, env)
+                Return Me.Tracking(cur.FromNode, cur.Route, tr, env)
             End If
         End Function
 
@@ -86,7 +84,7 @@ Namespace ABNF
         ''' <param name="env">解析環境。</param>
         ''' <returns>解析が成功した場合に True を返します。</returns>
         Public Function MoveNext(tr As PositionAdjustBytes,
-                                 env As ABNFEnvironment) As (success As Boolean, shift As Integer)
+                                 env As ABNFEnvironment) As (success As Boolean, shift As Integer) Implements IAnalysisMatcher.MoveNext
             If Me._stack.Count = 0 Then
                 ' 初回開始
                 Me._arrived.Clear()
@@ -97,7 +95,7 @@ Namespace ABNF
                 Dim cur = Me._stack.Pop()
                 Me.DecrementArrived(cur.ToNode.Id)
                 tr.Seek(cur.StartPosition)
-                Return Me.Tracking(cur.ToNode, cur.Route + 1, tr, env)
+                Return Me.Tracking(cur.FromNode, cur.Route + 1, tr, env)
             End If
         End Function
 
@@ -219,7 +217,7 @@ Namespace ABNF
                 Dim preview = Me._stack.Pop()
                 Dim selectedNode = preview.FromNode
                 Me.DecrementArrived(preview.ToNode.Id)
-                tr.Seek(preview.startPosition)
+                tr.Seek(preview.StartPosition)
 
                 ' リトライを試みる
                 Dim retry = preview.ToNode.MoveNext(tr, env)
@@ -254,8 +252,9 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="nodeId">ノードID。</param>
         Private Sub IncrementArrived(nodeId As Integer)
-            If Me._arrived.ContainsKey(nodeId) Then
-                Me._arrived(nodeId) += 1
+            Dim currentCount As Integer
+            If Me._arrived.TryGetValue(nodeId, currentCount) Then
+                Me._arrived(nodeId) = currentCount + 1
             Else
                 Me._arrived.Add(nodeId, 1)
             End If
@@ -285,28 +284,56 @@ Namespace ABNF
         ''' 解析結果を取得する。
         ''' </summary>
         ''' <returns>解析結果リスト。</returns>
-        Public Function GetAnswer() As List(Of ABNFAnalysisItem)
-            Dim res As New List(Of ABNFAnalysisItem)()
+        Public Function GetAnswer() As List(Of ABNFAnalysisItem) Implements IAnalysisMatcher.GetAnswer
+            If Me._stack.Count = 0 Then
+                Return New List(Of ABNFAnalysisItem)()
+            End If
+
+            Dim res As New List(Of ABNFAnalysisItem)(Me._stack.Count)
             For Each item In Me._stack
-                If item.answer IsNot Nothing Then
-                    res.Add(item.answer)
+                If item.Answer IsNot Nothing Then
+                    res.Add(item.Answer)
                 End If
             Next
             res.Reverse()
             Return res
         End Function
 
-        Friend Sub ClearCache()
+        ''' <summary>
+        ''' キャッシュをクリアします。
+        ''' </summary>
+        Public Sub ClearCache() Implements IAnalysisMatcher.ClearCache
             Dim idHash As New HashSet(Of Integer)()
             Me._root.ClearCache(idHash)
         End Sub
 
+        ''' <summary>解析スタック状態。</summary>
         Private Structure StackState
+
+            ''' <summary>開始ノード。</summary>
             Public ReadOnly Property FromNode As AnalysisNode
+
+            ''' <summary>終了ノード。</summary>
             Public ReadOnly Property ToNode As AnalysisNode
+
+            ''' <summary>ルート番号。</summary>
             Public ReadOnly Property Route As Integer
+
+            ''' <summary>開始位置。</summary>
             Public ReadOnly Property StartPosition As Integer
+
+            ''' <summary>解析結果。</summary>
             Public ReadOnly Property Answer As ABNFAnalysisItem
+
+            ''' <summary>
+            ''' コンストラクタ。
+            ''' </summary>
+            ''' <param name="fromNode">開始ノード。</param>
+            ''' <param name="toNode">終了ノード。</param>
+            ''' <param name="route">ルート番号。</param>
+            ''' <param name="startPosition">開始位置。</param>
+            ''' <param name="endPosition">終了位置。</param>
+            ''' <param name="answer">解析結果。</param>
             Public Sub New(fromNode As AnalysisNode,
                            toNode As AnalysisNode,
                            route As Integer,
@@ -319,9 +346,15 @@ Namespace ABNF
                 Me.StartPosition = startPosition
                 Me.Answer = answer
             End Sub
+
+            ''' <summary>
+            ''' 文字列表現を取得する。
+            ''' </summary>
+            ''' <returns>文字列表現。</returns>
             Overrides Function ToString() As String
                 Return $"From:{Me.FromNode.Id}, To:{Me.ToNode.Id}, Route:{Me.Route}, Start:{Me.StartPosition}"
             End Function
+
         End Structure
 
         ''' <summary>追跡状態。</summary>

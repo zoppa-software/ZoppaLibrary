@@ -1,7 +1,6 @@
 ﻿Option Explicit On
 Option Strict On
 
-Imports System.Text.RegularExpressions
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF
@@ -12,14 +11,10 @@ Namespace ABNF
     NotInheritable Class RuleNameNode
         Inherits AnalysisNode
 
-        ''' <summary>
-        ''' 位置ごとのマッチャーキャッシュ。
-        ''' </summary>
-        Private ReadOnly _matchers As New SortedDictionary(Of Integer, AnalysisMatcher)()
+        ''' <summary>位置ごとのマッチャーキャッシュ。</summary>
+        Private ReadOnly _matchers As New SortedDictionary(Of Integer, IAnalysisMatcher)()
 
-        ''' <summary>
-        ''' ルール名。
-        ''' </summary>
+        ''' <summary>ルール名。</summary>
         Private ReadOnly _ruleName As String
 
         ''' <summary>評価範囲。</summary>
@@ -104,8 +99,8 @@ Namespace ABNF
         ''' <param name="position">位置。</param>
         ''' <param name="env">ABNF環境。</param>
         ''' <returns>マッチャー。</returns>
-        Private Function GetMatcher(position As Integer, env As ABNFEnvironment) As AnalysisMatcher
-            Dim iterator As AnalysisMatcher
+        Private Function GetMatcher(position As Integer, env As ABNFEnvironment) As IAnalysisMatcher
+            Dim iterator As IAnalysisMatcher
             If Me._matchers.ContainsKey(position) Then
                 iterator = Me._matchers(position)
             ElseIf env.RuleTable.ContainsKey(Me._ruleName) Then

@@ -131,20 +131,6 @@ Namespace ABNF
         End Function
 
         ''' <summary>
-        ''' ルートを並び替える。
-        ''' </summary>
-        ''' <param name="id">ノードID。</param>
-        Friend Sub MoveEndRoute(id As Integer)
-            For i As Integer = Routes.Count - 1 To 0 Step -1
-                If Me.Routes(i).NextNode.Id = id Then
-                    Dim route = Me.Routes(i)
-                    Me.Routes.RemoveAt(i)
-                    Me.Routes.Add(route)
-                End If
-            Next
-        End Sub
-
-        ''' <summary>
         ''' 文字列表現を取得する。
         ''' </summary>
         ''' <returns>文字列表現。</returns>

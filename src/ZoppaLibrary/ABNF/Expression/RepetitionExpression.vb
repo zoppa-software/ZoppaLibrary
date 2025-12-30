@@ -93,7 +93,12 @@ Namespace ABNF
                 Loop
                 If nena Then
                     ranges(1) = New ExpressionRange(Me, tr, nest, tr.Position, ExpressionRange.EmptyRanges)
+                Else
+                    ranges(1) = ExpressionRange.Invalid
                 End If
+            Else
+                ' "*" がなければ先頭の数字のみ
+                ranges(1) = ranges(0)
             End If
 
             ' マッチ結果を返す

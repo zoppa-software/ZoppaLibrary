@@ -1,7 +1,6 @@
 ﻿Option Explicit On
 Option Strict On
 
-Imports System.Security.Cryptography
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF
@@ -21,6 +20,11 @@ Namespace ABNF
         ''' </summary>
         ''' <returns>ルール名。</returns>
         Public ReadOnly Property RuleName As String
+
+        ''' <summary>
+        ''' 単純ルートか。
+        ''' </summary>
+        Private _isSimple As Boolean = True
 
         ''' <summary>
         ''' コンストラクタ。
@@ -52,7 +56,6 @@ Namespace ABNF
             ' 評価用グラフを作成
             ' 1. 評価ノードを作成
             ' 2. ルートを接続
-            ' 3. ルートを並び変え
             Dim analysis As New SortedDictionary(Of Integer, AnalysisNode)() ' 1
             For Each kvp In pattern
                 With kvp.Value.StartNode
@@ -67,9 +70,7 @@ Namespace ABNF
                     End If
                 Next
             Next
-            For Each kvp In analysis ' 3
-                kvp.Value.MoveEndRoute(endNode.Id)
-            Next
+
             Me._root = analysis(startNode.Id)
         End Sub
 
@@ -307,9 +308,40 @@ Namespace ABNF
         ''' マッチャーを取得する。
         ''' </summary>
         ''' <returns>マッチャー。</returns>
-        Public Function GetMatcher() As AnalysisMatcher
-            Return New AnalysisMatcher(Me._root, Me.RuleName)
+        Public Function GetMatcher() As IAnalysisMatcher
+            Return If(
+                Me._isSimple,
+                CType(New SimpleAnalysisMatcher(Me._root, Me.RuleName), IAnalysisMatcher),
+                New AnalysisMatcher(Me._root, Me.RuleName)
+            )
         End Function
+
+        ''' <summary>
+        ''' 単純ルートかを確認する。
+        ''' </summary>
+        ''' <param name="ruleTable">ルールテーブル。</param>
+        Public Sub CheckSimpleRoute(ruleTable As SortedDictionary(Of String, RuleAnalysis))
+            Dim nd = Me._root
+            Do While True
+                If nd.IsRetry Then
+                    Me._isSimple = False
+                    Exit Do
+                End If
+
+                Select Case nd.Routes.Count
+                    Case 0
+                        ' 終端ノードの場合、単純ルート
+                        Me._isSimple = True
+                        Exit Do
+                    Case 1
+                        nd = nd.Routes(0).NextNode
+                    Case Else
+                        ' 複数ルートの場合、分岐ルート
+                        Me._isSimple = False
+                        Exit Do
+                End Select
+            Loop
+        End Sub
 
         ''' <summary>
         ''' 文字列表現を取得する。
@@ -319,18 +351,6 @@ Namespace ABNF
             Return $"<{Me.RuleName}>"
         End Function
 
-        ''' <summary>
-        ''' キャッシュをクリアします。
-        ''' </summary>
-        ''' <param name="idHash">クリア済みノードIDセット。</param>
-        Friend Sub ClearCache(idHash As HashSet(Of Integer))
-            For Each route In Me._root.Routes
-                If Not idHash.Contains(route.NextNode.Id) Then
-                    idHash.Add(route.NextNode.Id)
-                    route.NextNode.ClearCache(idHash)
-                End If
-            Next
-        End Sub
 
         ''' <summary>評価ノード。</summary>
         Private NotInheritable Class Node

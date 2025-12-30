@@ -2,13 +2,9 @@
 Option Strict On
 
 Imports System.IO
-Imports System.Net.Sockets
 Imports System.Runtime.CompilerServices
 Imports System.Text
 Imports ZoppaLibrary.BNF
-Imports ZoppaLibrary.EBNF
-Imports ZoppaLibrary.EBNF.EBNFSyntaxAnalysis
-Imports ZoppaLibrary.Strings
 
 Namespace ABNF
 
@@ -39,12 +35,20 @@ Namespace ABNF
         ''' <returns>ルールテーブル。</returns>
         Private Function CreateRuleTable(range As ExpressionRange) As SortedDictionary(Of String, RuleAnalysis)
             Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
+
+            ' ルール名ごとの RuleAnalysis を作成
             For Each sr In range.SubRanges
                 Dim key = sr.SubRanges(0).ToString()
                 If Not ruleTable.ContainsKey(key) Then
                     ruleTable.Add(key, New RuleAnalysis(key, sr.SubRanges(1)))
                 End If
             Next
+
+            ' 単純ルートかチェックする
+            For Each kvp In ruleTable
+                kvp.Value.CheckSimpleRoute(ruleTable)
+            Next
+
             Return ruleTable
         End Function
 
@@ -400,16 +404,6 @@ Namespace ABNF
             End Sub
 
             ''' <summary>
-            ''' ルールキャッシュをクリアします。
-            ''' </summary>
-            Friend Sub ClearCache()
-                Dim idHash As New HashSet(Of Integer)()
-                For Each kvp In Me.RuleTable
-                    kvp.Value.ClearCache(idHash)
-                Next
-            End Sub
-
-            ''' <summary>
             ''' 特殊メソッドテーブルをクリアします。
             ''' </summary>
             Private Sub InnerClearSpecialMethods()
@@ -476,7 +470,9 @@ Namespace ABNF
                 If Me._failRange.Enable Then
                     msg.Append($"評価範囲:{Me._failRange}, ")
                 End If
-                msg.Append($"データ位置:{Me._failPos} データ:{Me._failTr.Substring(Me._failPos, 20)}")
+                If Me._failPos >= 0 Then
+                    msg.Append($"データ位置:{Me._failPos} データ:{Me._failTr.Substring(Me._failPos, 20)}")
+                End If
                 Throw New ABNFException(msg.ToString())
             End Sub
 
@@ -504,7 +500,7 @@ Namespace ABNF
                 If Not arrivals.Contains(node) Then
                     arrivals.Add(node)
 
-                    'out.Write($"node:{node} -> ")
+                    out.Write($"node:{node} -> ")
                     'For Each nextNode In node.Pattern
                     '    out.Write($"{nextNode}, ")
                     'Next
