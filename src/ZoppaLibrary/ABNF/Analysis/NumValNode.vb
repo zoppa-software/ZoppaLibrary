@@ -31,13 +31,16 @@ Namespace ABNF
         ''' </summary>
         Private ReadOnly _numValues As UInteger()
 
+        ''' <summary>評価範囲。</summary>
+        Public Overrides ReadOnly Property Range As ExpressionRange
+
         ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="id">ノードID。</param>
         ''' <param name="range">式範囲。</param>
         Public Sub New(id As Integer, range As ExpressionRange)
-            MyBase.New(id, range)
+            MyBase.New(id)
 
             ' 数値の種類を判定
             Select Case range.SubRanges(0).Expr.GetType()
@@ -69,6 +72,8 @@ Namespace ABNF
                     Next
             End Select
             Me._numValues = list.ToArray()
+
+            Me.Range = range
         End Sub
 
         ''' <summary>

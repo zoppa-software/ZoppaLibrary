@@ -17,14 +17,18 @@ Namespace ABNF
         ''' </summary>
         Private ReadOnly _literal As Byte()
 
+        ''' <summary>評価範囲。</summary>
+        Public Overrides ReadOnly Property Range As ExpressionRange
+
         ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="id">ノードID。</param>
         ''' <param name="range">式範囲。</param>
         Public Sub New(id As Integer, range As ExpressionRange)
-            MyBase.New(id, range)
+            MyBase.New(id)
             Me._literal = Encoding.UTF8.GetBytes(range.SubRanges(0).ToString())
+            Me.Range = range
         End Sub
 
         ''' <summary>

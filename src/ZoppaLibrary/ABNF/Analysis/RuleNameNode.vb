@@ -1,6 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.Text.RegularExpressions
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF
@@ -21,6 +22,9 @@ Namespace ABNF
         ''' </summary>
         Private ReadOnly _ruleName As String
 
+        ''' <summary>評価範囲。</summary>
+        Public Overrides ReadOnly Property Range As ExpressionRange
+
         ''' <summary>
         ''' 再試行可能かを取得する。
         ''' </summary
@@ -36,8 +40,16 @@ Namespace ABNF
         ''' <param name="id">ノードID。</param>
         ''' <param name="range">式範囲。</param>
         Public Sub New(id As Integer, range As ExpressionRange)
-            MyBase.New(id, range)
+            MyBase.New(id)
             Me._ruleName = range.ToString()
+            Me.Range = range
+        End Sub
+
+        ''' <summary>
+        ''' キャッシュをクリアします。（実装）
+        ''' </summary>
+        Protected Overrides Sub ClearCacheImpl()
+            Me._matchers.Clear()
         End Sub
 
         ''' <summary>
@@ -96,8 +108,11 @@ Namespace ABNF
             Dim iterator As AnalysisMatcher
             If Me._matchers.ContainsKey(position) Then
                 iterator = Me._matchers(position)
-            Else
+            ElseIf env.RuleTable.ContainsKey(Me._ruleName) Then
                 iterator = env.RuleTable(Me._ruleName).GetMatcher()
+                Me._matchers.Add(position, iterator)
+            Else
+                iterator = New RuleAnalysis(Me._ruleName, env.MethodTable(Me._ruleName)).GetMatcher()
                 Me._matchers.Add(position, iterator)
             End If
             Return iterator

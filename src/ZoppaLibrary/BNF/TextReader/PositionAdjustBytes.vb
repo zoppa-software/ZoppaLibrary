@@ -139,6 +139,25 @@ Namespace BNF
         End Function
 
         ''' <summary>
+        ''' 指定位置から部分文字列を取得します。
+        ''' </summary>
+        ''' <param name="position">開始位置。</param>
+        ''' <param name="length">長さ。</param>
+        ''' <returns>部分文字列。</returns>
+        Friend Function Substring(position As Integer, Optional length As Integer = Integer.MaxValue) As String
+            Dim strBuilder As New System.Text.StringBuilder()
+            For i As Integer = position To position + length - 1
+                If i >= Me._source.Length Then
+                    Exit For
+                End If
+                Dim b As Byte = Me._source(i)
+                strBuilder.Append(String.Format("{0:X2}({1}) ", b, If(b >= &H20 AndAlso b <= &H7E, ChrW(b), " "c)))
+            Next
+
+            Return strBuilder.ToString().TrimEnd()
+        End Function
+
+        ''' <summary>
         ''' スナップショット位置。
         ''' </summary>
         Public NotInheritable Class SnapshotPosition

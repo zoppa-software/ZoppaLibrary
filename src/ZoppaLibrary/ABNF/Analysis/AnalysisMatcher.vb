@@ -1,6 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.Text.RegularExpressions
 Imports ZoppaLibrary.ABNF.AnalysisNode
 Imports ZoppaLibrary.BNF
 Imports ZoppaLibrary.EBNF
@@ -42,7 +43,7 @@ Namespace ABNF
         Private ReadOnly _ruleName As String
 
         ''' <summary>解析スタック。</summary>
-        Private ReadOnly _stack As New Stack(Of (selectedNode As AnalysisNode, selectedRoute As Integer, trPosition As Integer, answer As ABNFAnalysisItem))()
+        Private ReadOnly _stack As New Stack(Of StackState)()
 
         ''' <summary>到達回数記録。</summary>
         Private ReadOnly _arrived As New SortedDictionary(Of Integer, Integer)()
@@ -67,13 +68,14 @@ Namespace ABNF
             If Me._stack.Count = 0 Then
                 ' 初回開始
                 Me._arrived.Clear()
+                Me.IncrementArrived(Me._root.Id)
                 Return Me.Tracking(Me._root, 0, tr, env)
             Else
                 ' 継続解析
                 Dim cur = Me._stack.Pop()
-                Me.DecrementArrived(cur.selectedNode.Id)
-                tr.Seek(cur.trPosition)
-                Return Me.Tracking(cur.selectedNode, cur.selectedRoute, tr, env)
+                Me.DecrementArrived(cur.ToNode.Id)
+                tr.Seek(cur.StartPosition)
+                Return Me.Tracking(cur.ToNode, cur.Route, tr, env)
             End If
         End Function
 
@@ -88,13 +90,14 @@ Namespace ABNF
             If Me._stack.Count = 0 Then
                 ' 初回開始
                 Me._arrived.Clear()
+                Me.IncrementArrived(Me._root.Id)
                 Return Me.Tracking(Me._root, 0, tr, env)
             Else
                 ' 継続解析
                 Dim cur = Me._stack.Pop()
-                Me.DecrementArrived(cur.selectedNode.Id)
-                tr.Seek(cur.trPosition)
-                Return Me.Tracking(cur.selectedNode, cur.selectedRoute + 1, tr, env)
+                Me.DecrementArrived(cur.ToNode.Id)
+                tr.Seek(cur.StartPosition)
+                Return Me.Tracking(cur.ToNode, cur.Route + 1, tr, env)
             End If
         End Function
 
@@ -110,6 +113,7 @@ Namespace ABNF
                                   route As Integer,
                                   tr As PositionAdjustBytes,
                                   env As ABNFEnvironment) As (success As Boolean, shift As Integer)
+            Dim startPosition = tr.Position
             Dim iterationCount As Integer = 0
             Dim currentPosition = tr.Position
             Dim action As BacktrackAction
@@ -153,7 +157,7 @@ Namespace ABNF
                         End If
 
                         ' 次のノードへ進む
-                        Me._stack.Push((nextNode, route, currentPosition, matched.answer))
+                        Me._stack.Push(New StackState(node, nextNode, route, currentPosition, tr.Position, matched.answer))
                         currentPosition = tr.Position
                         node = nextNode
                         route = 0
@@ -164,6 +168,11 @@ Namespace ABNF
                         tr.Seek(currentPosition)
                     End If
                 Loop
+
+                ' 最終ノードに到達した場合は成功
+                If node.Routes.Count = 0 Then
+                    Return (True, 0)
+                End If
 
                 ' 全てのルートを試行しても一致しない場合はノードを遡る
                 Do
@@ -211,27 +220,27 @@ Namespace ABNF
 
                 ' ひとつ前のノード、位置へ戻る
                 Dim preview = Me._stack.Pop()
-                Dim selectedNode = preview.selectedNode
-                tr.Seek(preview.trPosition)
+                Dim selectedNode = preview.FromNode
+                Me.DecrementArrived(preview.ToNode.Id)
+                tr.Seek(preview.startPosition)
 
                 ' リトライを試みる
-                Dim retry = selectedNode.MoveNext(tr, env)
+                Dim retry = preview.ToNode.MoveNext(tr, env)
                 If retry.success Then
                     ' リトライ成功の場合はそのまま進む
-                    Me._stack.Push((selectedNode, selectedRoute, preview.trPosition, retry.answer))
-                    Return New TrackingState(BacktrackAction.RetryMatch, selectedNode, 0, tr.Position)
+                    Me._stack.Push(New StackState(preview.FromNode, preview.ToNode, preview.Route, preview.StartPosition, tr.Position, retry.answer))
+                    Me.IncrementArrived(preview.ToNode.Id)
+                    Return New TrackingState(BacktrackAction.RetryMatch, preview.ToNode, 0, tr.Position)
 
-                ElseIf preview.selectedRoute + 1 < selectedNode.Routes.Count Then
+                ElseIf preview.Route + 1 < selectedNode.Routes.Count Then
                     ' 選択肢が存在する場合は次の選択肢へ
-                    Me.DecrementArrived(selectedNode.Id)
-                    Return New TrackingState(BacktrackAction.RetryMatch, selectedNode, preview.selectedRoute + 1, preview.trPosition)
+                    Return New TrackingState(BacktrackAction.RetryMatch, selectedNode, preview.Route + 1, preview.StartPosition)
 
                 Else
                     ' 選択肢が存在しない、かつリトライ可能な場合はリトライへ
                     ' そうでない場合は終了
-                    currentPosition = preview.trPosition
-                    Me.DecrementArrived(selectedNode.Id)
-                    If preview.selectedNode.IsRetry Then
+                    currentPosition = preview.StartPosition
+                    If preview.ToNode.IsRetry Then
                         Return New TrackingState(BacktrackAction.RetryMoveNext, selectedNode, selectedRoute, tr.Position)
                     Else
                         Return New TrackingState(BacktrackAction.ExitTracking, Nothing, 0, 0)
@@ -289,6 +298,31 @@ Namespace ABNF
             res.Reverse()
             Return res
         End Function
+
+        Private Structure StackState
+            Public ReadOnly Property FromNode As AnalysisNode
+            Public ReadOnly Property ToNode As AnalysisNode
+            Public ReadOnly Property Route As Integer
+            Public ReadOnly Property StartPosition As Integer
+            Public ReadOnly Property EndPosition As Integer
+            Public ReadOnly Property Answer As ABNFAnalysisItem
+            Public Sub New(fromNode As AnalysisNode,
+                           toNode As AnalysisNode,
+                           route As Integer,
+                           startPosition As Integer,
+                           endPosition As Integer,
+                           answer As ABNFAnalysisItem)
+                Me.FromNode = fromNode
+                Me.ToNode = toNode
+                Me.Route = route
+                Me.StartPosition = startPosition
+                Me.EndPosition = endPosition
+                Me.Answer = answer
+            End Sub
+            Overrides Function ToString() As String
+                Return $"From:{Me.FromNode.Id}, To:{Me.ToNode.Id}, Route:{Me.Route}, Start:{Me.StartPosition}, End:{Me.EndPosition}"
+            End Function
+        End Structure
 
         ''' <summary>追跡状態。</summary>
         Private Structure TrackingState

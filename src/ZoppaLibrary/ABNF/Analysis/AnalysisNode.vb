@@ -15,7 +15,11 @@ Namespace ABNF
         Public ReadOnly Property Id As Integer
 
         ''' <summary>評価範囲。</summary>
-        Public ReadOnly Property Range As ExpressionRange
+        Public Overridable ReadOnly Property Range As ExpressionRange
+            Get
+                Return ExpressionRange.Invalid
+            End Get
+        End Property
 
         ''' <summary>接続ルート。</summary>
         Public ReadOnly Property Routes As List(Of Route)
@@ -34,9 +38,8 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="id">ID。</param>
         ''' <param name="range">評価範囲。</param>
-        Public Sub New(id As Integer, range As ExpressionRange)
+        Public Sub New(id As Integer)
             Me.Id = id
-            Me.Range = range
             Me.Routes = New List(Of Route)()
         End Sub
 
@@ -55,9 +58,41 @@ Namespace ABNF
                 Case GetType(RuleNameExpression)
                     Return New RuleNameNode(id, range)
                 Case Else
-                    Return New AnalysisNode(id, range)
+                    Return New AnalysisNode(id)
             End Select
         End Function
+
+        ''' <summary>
+        ''' インスタンスを生成する。
+        ''' </summary>
+        ''' <param name="id">ID。</param>
+        ''' <param name="name">名前。</param>
+        ''' <param name="method">マッチ対象を判定する関数。</param>
+        ''' <returns>生成されたインスタンス。</returns>
+        Public Shared Function Create(id As Integer, name As String, method As Func(Of PositionAdjustBytes, Boolean)) As AnalysisNode
+            Return New MethodNode(id, name, method)
+        End Function
+
+        ''' <summary>
+        ''' キャッシュをクリアします。
+        ''' </summary>
+        ''' <param name="idHash">クリア済みノードIDハッシュセット。</param>
+        Friend Sub ClearCache(idHash As HashSet(Of Integer))
+            Me.ClearCacheImpl()
+            For Each route In Me.Routes
+                If Not idHash.Contains(route.NextNode.Id) Then
+                    idHash.Add(route.NextNode.Id)
+                    route.NextNode.ClearCache(idHash)
+                End If
+            Next
+        End Sub
+
+        ''' <summary>
+        ''' キャッシュをクリアします。（実装）
+        ''' </summary>
+        Protected Overridable Sub ClearCacheImpl()
+            ' 何もしない
+        End Sub
 
         ''' <summary>
         ''' ルートを追加する。
@@ -89,18 +124,7 @@ Namespace ABNF
         ''' <param name="ruleName">ルール名。</param>
         ''' <returns>マッチ結果。</returns>
         Public Overridable Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
-            Dim snapPos = tr.MemoryPosition()
-
-            ' 解析を実行
-            If Me.Range.Expr Is Nothing Then
-                ' 空文字列
-                Return (True, Nothing)
-            Else
-                Throw New NotImplementedException()
-            End If
-
-            snapPos.Restore()
-            Return (False, Nothing)
+            Return (True, Nothing)
         End Function
 
         ''' <summary>
@@ -112,6 +136,20 @@ Namespace ABNF
         Public Overridable Function MoveNext(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, isRetry As Boolean, answer As ABNFAnalysisItem)
             Return (False, False, Nothing)
         End Function
+
+        ''' <summary>
+        ''' ルートを並び替える。
+        ''' </summary>
+        ''' <param name="id">ノードID。</param>
+        Friend Sub MoveEndRoute(id As Integer)
+            For i As Integer = Routes.Count - 1 To 0 Step -1
+                If Me.Routes(i).NextNode.Id = id Then
+                    Dim route = Me.Routes(i)
+                    Me.Routes.RemoveAt(i)
+                    Me.Routes.Add(route)
+                End If
+            Next
+        End Sub
 
         ''' <summary>
         ''' 文字列表現を取得する。
@@ -147,6 +185,7 @@ Namespace ABNF
                 Me.RequiredVisits = required
                 Me.LimitedVisits = limited
             End Sub
+
         End Structure
 
     End Class

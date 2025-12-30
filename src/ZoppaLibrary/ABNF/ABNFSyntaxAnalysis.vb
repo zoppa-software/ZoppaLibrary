@@ -4,6 +4,7 @@ Option Strict On
 Imports System.IO
 Imports System.Net.Sockets
 Imports System.Runtime.CompilerServices
+Imports System.Text
 Imports ZoppaLibrary.BNF
 Imports ZoppaLibrary.EBNF
 Imports ZoppaLibrary.EBNF.EBNFSyntaxAnalysis
@@ -51,25 +52,25 @@ Namespace ABNF
         Public Function Evaluate(env As ABNFEnvironment, ident As String, target As PositionAdjustBytes) As ABNFAnalysisItem
             If env.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
-                Dim iter = env.RuleTable(ident).GetMatcher()
-                Dim res = iter.MoveNext(target, env)
-                If res.success AndAlso target.Peek() = -1 Then
-                    env.Answer = New ABNFAnalysisItem(ident, iter.GetAnswer(), target, startPos, target.Position)
-                    Return env.Answer
-                End If
-                'Dim startPos = target.Position
-                'Dim answers As New List(Of ABNFAnalysisItem)()
+                Dim matcher = env.RuleTable(ident).GetMatcher()
 
-                '' 解析実行
-                'Dim res = env.RuleTable(ident).Match(target, env, env.RuleTable, ident, answers, New Dictionary(Of IAnalysis, Integer)())
+                ' 解析実行
+                env.ClearCache()
+                Do While target.Peek() <> -1
+                    Dim res = matcher.MoveNext(target, env)
 
-                '' 解析でき、かつ全て消費した場合は成功
-                'If res.sccess AndAlso target.Peek() = -1 Then
-                '    env.Answer = New ABNFAnalysisItem(ident, answers, target, startPos, target.Position)
-                '    Return env.Answer
-                'End If
-                'env.ThrowFailureException(ident)
-                Throw New ABNFException("解析失敗")
+                    ' 解析でき、かつ全て消費した場合は成功
+                    If res.success Then
+                        If target.Peek() = -1 Then
+                            env.Answer = New ABNFAnalysisItem(ident, matcher.GetAnswer(), target, startPos, target.Position)
+                            Return env.Answer
+                        End If
+                        target.Seek(startPos)
+                    Else
+                        Exit Do
+                    End If
+                Loop
+                env.ThrowFailureException(ident)
             End If
             Throw New ABNFException($"指定された識別子 '{ident}' はルールに存在しません。")
         End Function
@@ -81,7 +82,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function ALPHA(tr As IPositionAdjustReader) As Boolean
+        Private Function ALPHA(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c >= AscW("A"c) AndAlso c <= AscW("Z"c) OrElse
                c >= AscW("a"c) AndAlso c <= AscW("z"c) Then
@@ -97,7 +98,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function DIGIT(tr As IPositionAdjustReader) As Boolean
+        Private Function DIGIT(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c >= AscW("0"c) AndAlso c <= AscW("9"c) Then
                 tr.Read()
@@ -112,7 +113,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function HEXDIG(tr As IPositionAdjustReader) As Boolean
+        Private Function HEXDIG(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If (c >= AscW("0"c) AndAlso c <= AscW("9"c)) OrElse
                (c >= AscW("A"c) AndAlso c <= AscW("F"c)) OrElse
@@ -129,7 +130,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function DQUOTE(tr As IPositionAdjustReader) As Boolean
+        Private Function DQUOTE(tr As PositionAdjustBytes) As Boolean
             If tr.Peek() = &H22 Then
                 tr.Read()
                 Return True
@@ -143,7 +144,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function SP(tr As IPositionAdjustReader) As Boolean
+        Private Function SP(tr As PositionAdjustBytes) As Boolean
             If tr.Peek() = &H20 Then
                 tr.Read()
                 Return True
@@ -157,7 +158,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function HTAB(tr As IPositionAdjustReader) As Boolean
+        Private Function HTAB(tr As PositionAdjustBytes) As Boolean
             If tr.Peek() = &H9 Then
                 tr.Read()
                 Return True
@@ -171,7 +172,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function WSP(tr As IPositionAdjustReader) As Boolean
+        Private Function WSP(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c = &H20 OrElse c = &H9 Then
                 tr.Read()
@@ -186,14 +187,14 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function LWSP(tr As IPositionAdjustReader) As Boolean
+        Private Function LWSP(tr As PositionAdjustBytes) As Boolean
             Dim res = False
             Do While True
                 Dim c = tr.Peek()
                 If c = &H20 OrElse c = &H9 Then
                     tr.Read()
                     res = True
-                ElseIf IsCrlfAndWsp(tr) Then
+                ElseIf IsCrLfAndWsp(tr) Then
                     tr.Read()
                     res = True
                 Else
@@ -208,7 +209,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function IsCrLfAndWsp(tr As IPositionAdjustReader) As Boolean
+        Private Function IsCrLfAndWsp(tr As PositionAdjustBytes) As Boolean
             Dim snap = tr.MemoryPosition()
             If tr.Peek() = &HD Then
                 tr.Read()
@@ -230,7 +231,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function VCHAR(tr As IPositionAdjustReader) As Boolean
+        Private Function VCHAR(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c >= &H21 AndAlso c <= &H7E Then
                 tr.Read()
@@ -245,7 +246,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function CHARMethod(tr As IPositionAdjustReader) As Boolean
+        Private Function CHARMethod(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c >= &H1 AndAlso c <= &H7F Then
                 tr.Read()
@@ -260,7 +261,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function OCTET(tr As IPositionAdjustReader) As Boolean
+        Private Function OCTET(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c >= &H0 AndAlso c <= &HFF Then
                 tr.Read()
@@ -275,7 +276,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function CTL(tr As IPositionAdjustReader) As Boolean
+        Private Function CTL(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If (c >= &H0 AndAlso c <= &H1F) OrElse c = &H7F Then
                 tr.Read()
@@ -290,7 +291,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function CR(tr As IPositionAdjustReader) As Boolean
+        Private Function CR(tr As PositionAdjustBytes) As Boolean
             If tr.Peek() = &HD Then
                 tr.Read()
                 Return True
@@ -304,7 +305,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function LF(tr As IPositionAdjustReader) As Boolean
+        Private Function LF(tr As PositionAdjustBytes) As Boolean
             If tr.Peek() = &HD Then
                 tr.Read()
                 Return True
@@ -318,7 +319,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function CRLF(tr As IPositionAdjustReader) As Boolean
+        Private Function CRLF(tr As PositionAdjustBytes) As Boolean
             Dim snap = tr.MemoryPosition()
             If tr.Peek() = &HD Then
                 tr.Read()
@@ -336,7 +337,7 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
-        Private Function BIT(tr As IPositionAdjustReader) As Boolean
+        Private Function BIT(tr As PositionAdjustBytes) As Boolean
             Dim c = tr.Peek()
             If c = AscW("0"c) OrElse c = AscW("1"c) Then
                 tr.Read()
@@ -356,7 +357,7 @@ Namespace ABNF
             ''' <summary>
             ''' 特殊メソッドテーブル。
             ''' </summary>
-            Public ReadOnly Property MethodTable As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))
+            Public ReadOnly Property MethodTable As SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))
 
             ''' <summary>
             ''' ルールテーブル。
@@ -392,10 +393,20 @@ Namespace ABNF
             ''' コンストラクター
             ''' </summary>
             Public Sub New()
-                Me.MethodTable = New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
+                Me.MethodTable = New SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))()
                 Me.InnerClearSpecialMethods()
 
                 Me.RuleTable = New SortedDictionary(Of String, RuleAnalysis)()
+            End Sub
+
+            ''' <summary>
+            ''' ルールキャッシュをクリアします。
+            ''' </summary>
+            Friend Sub ClearCache()
+                Dim idHash As New HashSet(Of Integer)()
+                For Each kvp In Me.RuleTable
+                    kvp.Value.ClearCache(idHash)
+                Next
             End Sub
 
             ''' <summary>
@@ -428,7 +439,7 @@ Namespace ABNF
             ''' </summary>
             ''' <param name="name">メソッド名。</param>
             ''' <param name="method">メソッド本体を表すデリゲート。</param>
-            Public Sub AddSpecialMethods(name As String, method As Func(Of IPositionAdjustReader, Boolean))
+            Public Sub AddSpecialMethods(name As String, method As Func(Of PositionAdjustBytes, Boolean))
                 If Me.MethodTable.Count <= 0 Then
                     InnerClearSpecialMethods()
                 End If
@@ -459,8 +470,14 @@ Namespace ABNF
             ''' </summary>
             ''' <param name="ident">失敗した識別子。</param>
             Public Sub ThrowFailureException(ident As String)
-                'Throw New ABNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}, 文字列: {Me._failTr.Substring(Me._failPos)}")
-                Throw New ABNFException($"識別子 '{ident}' の解析に失敗しました。 ルール: '{Me._failRuleName}', 評価範囲: {Me._failRange}")
+                Dim msg As New StringBuilder()
+                msg.Append($"識別子 '{ident}' の解析に失敗しました。 ")
+                msg.Append($"ルール:{Me._failRuleName}, ")
+                If Me._failRange.Enable Then
+                    msg.Append($"評価範囲:{Me._failRange}, ")
+                End If
+                msg.Append($"データ位置:{Me._failPos} データ:{Me._failTr.Substring(Me._failPos, 20)}")
+                Throw New ABNFException(msg.ToString())
             End Sub
 
             ''' <summary>

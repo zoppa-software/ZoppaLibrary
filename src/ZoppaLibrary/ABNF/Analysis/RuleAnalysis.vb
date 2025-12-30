@@ -1,6 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.Security.Cryptography
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF
@@ -51,6 +52,7 @@ Namespace ABNF
             ' 評価用グラフを作成
             ' 1. 評価ノードを作成
             ' 2. ルートを接続
+            ' 3. ルートを並び変え
             Dim analysis As New SortedDictionary(Of Integer, AnalysisNode)() ' 1
             For Each kvp In pattern
                 With kvp.Value.StartNode
@@ -59,13 +61,34 @@ Namespace ABNF
                 End With
             Next
             For Each kvp In pattern ' 2
-                For Each endEdge In kvp.Value.EndNodes
-                    If analysis.ContainsKey(endEdge.Item1.Id) Then
-                        analysis(kvp.Key).AddRoute(analysis(endEdge.Item1.Id), endEdge.Item2, endEdge.Item3)
+                For Each edge In kvp.Value.EndNodes
+                    If analysis.ContainsKey(edge.Item1.Id) Then
+                        analysis(kvp.Key).AddRoute(analysis(edge.Item1.Id), edge.Item2, edge.Item3)
                     End If
                 Next
             Next
+            For Each kvp In analysis ' 3
+                kvp.Value.MoveEndRoute(endNode.Id)
+            Next
             Me._root = analysis(startNode.Id)
+        End Sub
+
+        ''' <summary>
+        ''' コンストラクタ。
+        ''' </summary>
+        ''' <param name="name">ルール名。</param>
+        ''' <param name="method">マッチ対象を判定する関数。</param>
+        Public Sub New(name As String, method As Func(Of PositionAdjustBytes, Boolean))
+            Me.RuleName = name
+
+            ' ルートを作成
+            Dim startNode = AnalysisNode.Create(0, ExpressionRange.Invalid)
+            Dim methodNode = AnalysisNode.Create(1, name, method)
+            Dim endNode = AnalysisNode.Create(2, ExpressionRange.Invalid)
+            startNode.AddRoute(methodNode, 0, Integer.MaxValue)
+            methodNode.AddRoute(endNode, 0, Integer.MaxValue)
+
+            Me._root = startNode
         End Sub
 
 #Region "ルート作成"
@@ -212,8 +235,8 @@ Namespace ABNF
             End If
 
             ' 中間点から終了点へ接続
-            midRoute.ed.Routes.Add(endNode1)
             midRoute.ed.Routes.Add(endNode2)
+            midRoute.ed.Routes.Add(endNode1)
 
             ' 終了点から開始点へ接続（ループ）
             If maxCount > 1 Then
@@ -296,6 +319,19 @@ Namespace ABNF
             Return $"<{Me.RuleName}>"
         End Function
 
+        ''' <summary>
+        ''' キャッシュをクリアします。
+        ''' </summary>
+        ''' <param name="idHash">クリア済みノードIDセット。</param>
+        Friend Sub ClearCache(idHash As HashSet(Of Integer))
+            For Each route In Me._root.Routes
+                If Not idHash.Contains(route.NextNode.Id) Then
+                    idHash.Add(route.NextNode.Id)
+                    route.NextNode.ClearCache(idHash)
+                End If
+            Next
+        End Sub
+
         ''' <summary>評価ノード。</summary>
         Private NotInheritable Class Node
 
@@ -364,7 +400,6 @@ Namespace ABNF
             End Function
 
             ''' <summary>評価ノードを新規作成してリストに追加します。</summary>
-            ''' <returns>評価ノード。</returns>
             Public Function NewNode() As Node
                 Dim nd As New Node(Me.Count)
                 Me.Add(nd)
