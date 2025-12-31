@@ -5,8 +5,6 @@ Imports System.IO
 Imports System.Runtime.CompilerServices
 Imports System.Text
 Imports ZoppaLibrary.BNF
-Imports ZoppaLibrary.EBNF
-Imports ZoppaLibrary.EBNF.EBNFSyntaxAnalysis
 
 Namespace ABNF
 
