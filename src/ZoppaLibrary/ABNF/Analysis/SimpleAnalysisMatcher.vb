@@ -1,7 +1,6 @@
 ﻿Option Explicit On
 Option Strict On
 
-Imports ZoppaLibrary.ABNF.AnalysisNode
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF

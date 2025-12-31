@@ -27,6 +27,16 @@ Namespace ABNF
         Private _isSimple As Boolean = True
 
         ''' <summary>
+        ''' ルートの取得。
+        ''' </summary>
+        ''' <returns>ルート。</returns>
+        Public ReadOnly Property Routes As List(Of AnalysisNode.Route)
+            Get
+                Return Me._root.Routes
+            End Get
+        End Property
+
+        ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="name">ルール名。</param>

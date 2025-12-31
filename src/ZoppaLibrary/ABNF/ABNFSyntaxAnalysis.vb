@@ -5,10 +5,79 @@ Imports System.IO
 Imports System.Runtime.CompilerServices
 Imports System.Text
 Imports ZoppaLibrary.BNF
+Imports ZoppaLibrary.EBNF
+Imports ZoppaLibrary.EBNF.EBNFSyntaxAnalysis
 
 Namespace ABNF
 
+    ''' <summary>
+    ''' 構文解析機能を提供します（ABNF）
+    ''' </summary>
     Public Module ABNFSyntaxAnalysis
+
+        ''' <summary>
+        ''' 指定されたルール群に基づいて構文解析を実行します。
+        ''' </summary>
+        ''' <param name="rules">ABNF形式のルール群を表す文字列。</param>
+        ''' <param name="ident">解析対象のルール名（開始ルール）。</param>
+        ''' <param name="target">解析対象のバイト列。</param>
+        ''' <param name="addSpecMethods">
+        ''' カスタム特殊メソッドを追加するためのデリゲート。
+        ''' Nothing の場合は標準メソッドのみを使用します。
+        ''' </param>
+        ''' <returns>解析が成功した場合は解析結果、失敗した場合は例外をスローします。</returns>
+        ''' <exception cref="ABNFException">解析に失敗した場合。</exception>
+        ''' <exception cref="ArgumentNullException">引数がNothingの場合。</exception>
+        ''' <example>
+        ''' <code>
+        ''' Dim rules = "expr = DIGIT *( "+" DIGIT )"
+        ''' Dim target = New PositionAdjustBytes("1+2+3")
+        ''' Dim result = CompileToEvaluater(rules, "expr", target)
+        ''' </code>
+        ''' </example>
+        Public Function CompileToEvaluater(rules As String,
+                                           ident As String,
+                                           target As PositionAdjustBytes,
+                                           Optional addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))) = Nothing) As ABNFAnalysisItem
+            Dim env = CompileEnvironment(rules, addSpecMethods)
+            Return env.Evaluate(ident, target)
+        End Function
+
+        ''' <summary>
+        ''' 指定されたルール群に基づいて構文解析を実行します。
+        ''' </summary>
+        ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="ident">解析対象の識別子。</param>
+        ''' <param name="target">解析対象の位置調整リーダー。</param>
+        ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
+        ''' <returns>解析結果を表す <see cref="ABNFAnalysisItem"/>。</returns>
+        Public Function CompileToEvaluater(rules As IPositionAdjustReader,
+                                           ident As String,
+                                           target As PositionAdjustBytes,
+                                           Optional addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))) = Nothing) As ABNFAnalysisItem
+            Dim env = CompileEnvironment(rules, addSpecMethods)
+            Return env.Evaluate(ident, target)
+        End Function
+
+        ''' <summary>
+        ''' 指定されたルール群から構文解析環境を作成します。
+        ''' </summary>
+        ''' <param name="rules">ルール群を表す文字列。</param>
+        ''' <returns>構文解析環境。</returns>
+        Public Function CompileEnvironment(rules As String) As ABNFEnvironment
+            Return CompileEnvironment(New PositionAdjustString(rules), Nothing)
+        End Function
+
+        ''' <summary>
+        ''' 指定されたルール群に基づいてルールテーブルを作成します。
+        ''' </summary>
+        ''' <param name="rules">ルール群を表す文字列。</param>
+        ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
+        ''' <returns>ルールテーブルを含む <see cref="EBNFEnvironment"/>。</returns>
+        Public Function CompileEnvironment(rules As String,
+                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean)))) As ABNFEnvironment
+            Return CompileEnvironment(New PositionAdjustString(rules), addSpecMethods)
+        End Function
 
         ''' <summary>
         ''' 指定されたルール群から構文解析環境を作成します。
@@ -16,8 +85,27 @@ Namespace ABNF
         ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
         ''' <returns>構文解析環境。</returns>
         Public Function CompileEnvironment(rules As IPositionAdjustReader) As ABNFEnvironment
+            Return CompileEnvironment(rules, Nothing)
+        End Function
+
+        ''' <summary>
+        ''' 指定されたルール群に基づいてルールテーブルを作成します。
+        ''' </summary>
+        ''' <param name="rules">ルール群を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
+        ''' <returns>ルールテーブルを含む <see cref="EBNFEnvironment"/>。</returns>
+        Public Function CompileEnvironment(rules As IPositionAdjustReader,
+                                           addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean)))) As ABNFEnvironment
+            ' 引数チェック
+            If rules Is Nothing Then
+                Throw New ArgumentNullException(NameOf(rules))
+            End If
+
             '  メソッドテーブルを作成
             Dim answerEnv As New ABNFEnvironment()
+            If addSpecMethods IsNot Nothing Then
+                addSpecMethods(answerEnv.MethodTable)
+            End If
 
             ' ルールテーブルを作成
             Dim expr = New RuleListExpression()
@@ -52,31 +140,55 @@ Namespace ABNF
             Return ruleTable
         End Function
 
+        ''' <summary>
+        ''' 指定された識別子のルールで構文解析を実行します。
+        ''' </summary>
+        ''' <param name="env">構文解析環境。</param>
+        ''' <param name="ident">解析対象の識別子。</param>
+        ''' <param name="target">解析対象の位置調整リーダー。</param>
+        ''' <returns>解析結果を表す <see cref="ABNFAnalysisItem"/>。</returns>
         <Extension()>
         Public Function Evaluate(env As ABNFEnvironment, ident As String, target As PositionAdjustBytes) As ABNFAnalysisItem
-            If env.RuleTable.ContainsKey(ident) Then
-                Dim startPos = target.Position
-                Dim matcher = env.RuleTable(ident).GetMatcher()
-
-                ' 解析実行
-                matcher.ClearCache()
-                Do While target.Peek() <> -1
-                    Dim res = matcher.MoveNext(target, env)
-
-                    ' 解析でき、かつ全て消費した場合は成功
-                    If res.success Then
-                        If target.Peek() = -1 Then
-                            env.Answer = New ABNFAnalysisItem(ident, matcher.GetAnswer(), target, startPos, target.Position)
-                            Return env.Answer
-                        End If
-                        target.Seek(startPos)
-                    Else
-                        Exit Do
-                    End If
-                Loop
-                env.ThrowFailureException(ident)
+            ' 引数チェック
+            If String.IsNullOrWhiteSpace(ident) Then
+                Throw New ArgumentException("識別子が空です。", NameOf(ident))
             End If
-            Throw New ABNFException($"指定された識別子 '{ident}' はルールに存在しません。")
+
+            If target Is Nothing Then
+                Throw New ArgumentNullException(NameOf(target))
+            End If
+
+            ' ルールの存在確認
+            If Not env.RuleTable.ContainsKey(ident) Then
+                Throw New ABNFException($"指定された識別子 '{ident}' はルールに存在しません。")
+            End If
+
+            Dim startPos = target.Position
+            Dim matcher = env.RuleTable(ident).GetMatcher()
+            matcher.ClearCache()
+
+            ' 全パターンを試行
+            Do While target.Peek() <> -1
+                Dim res = matcher.MoveNext(target, env)
+
+                If res.success Then
+                    ' 全て消費した場合は成功
+                    If target.Peek() = -1 Then
+                        env.Answer = New ABNFAnalysisItem(ident, matcher.GetAnswer(), target, startPos, target.Position)
+                        Return env.Answer
+                    End If
+
+                    ' 次のパターンを試行
+                    target.Seek(startPos)
+                Else
+                    ' これ以上のパターンがない
+                    Exit Do
+                End If
+            Loop
+
+            ' 全パターン失敗
+            env.ThrowFailureException(ident)
+            Return Nothing  ' 到達しないが、コンパイラ警告回避
         End Function
 
 #Region "特殊メソッド"
@@ -310,7 +422,7 @@ Namespace ABNF
         ''' <param name="tr">テキストリーダー。</param>
         ''' <returns>一致したら真。</returns>
         Private Function LF(tr As PositionAdjustBytes) As Boolean
-            If tr.Peek() = &HD Then
+            If tr.Peek() = &HA Then  ' LF = 0x0A
                 tr.Read()
                 Return True
             Else
@@ -328,6 +440,7 @@ Namespace ABNF
             If tr.Peek() = &HD Then
                 tr.Read()
                 If tr.Peek() = &HA Then
+                    tr.Read()  ' LFも読み取る
                     Return True
                 End If
             End If
@@ -433,11 +546,30 @@ Namespace ABNF
             ''' </summary>
             ''' <param name="name">メソッド名。</param>
             ''' <param name="method">メソッド本体を表すデリゲート。</param>
-            Public Sub AddSpecialMethods(name As String, method As Func(Of PositionAdjustBytes, Boolean))
+            ''' <param name="overwrite">既存のメソッドを上書きする場合はTrue。</param>
+            ''' <exception cref="ArgumentException">既に登録済みで上書きがFalseの場合。</exception>
+            Public Sub AddSpecialMethods(name As String,
+                                         method As Func(Of PositionAdjustBytes, Boolean),
+                                         Optional overwrite As Boolean = False)
+                If String.IsNullOrWhiteSpace(name) Then
+                    Throw New ArgumentException("メソッド名が空です。", NameOf(name))
+                End If
+
+                If method Is Nothing Then
+                    Throw New ArgumentNullException(NameOf(method))
+                End If
+
                 If Me.MethodTable.Count <= 0 Then
                     InnerClearSpecialMethods()
                 End If
-                If Not Me.MethodTable.ContainsKey(name) Then
+
+                If Me.MethodTable.ContainsKey(name) Then
+                    If overwrite Then
+                        Me.MethodTable(name) = method
+                    Else
+                        Throw New ArgumentException($"メソッド '{name}' は既に登録されています。", NameOf(name))
+                    End If
+                Else
                     Me.MethodTable.Add(name, method)
                 End If
             End Sub
@@ -480,38 +612,68 @@ Namespace ABNF
             ''' ルールグラフをデバッグ出力します。
             ''' </summary>
             ''' <param name="out">出力先のテキストライター。</param>
+            ''' <param name="includeDetails">詳細情報を含める場合はTrue。</param>
             Public Sub DebugRuleGraphPrint(out As TextWriter)
+                If out Is Nothing Then
+                    Throw New ArgumentNullException(NameOf(out))
+                End If
+
                 out.WriteLine("***** ABNF ルール *****")
+                out.WriteLine($"登録ルール数: {Me.RuleTable.Count}")
+                out.WriteLine($"登録メソッド数: {Me.MethodTable.Count}")
+                out.WriteLine()
+
                 For Each kvp In Me.RuleTable
                     out.WriteLine($"ルール名: {kvp.Key}")
 
-                    Dim arrivals As New HashSet(Of RuleAnalysis)()
-                    DebugRuleGraphPrint(out, arrivals, kvp.Value)
+                    Dim arrivals As New HashSet(Of AnalysisNode)()
+                    For Each route In kvp.Value.Routes
+                        DebugRuleGraphPrint(out, arrivals, route.NextNode, indent:=1)
+                    Next
+                    out.WriteLine()
                 Next
             End Sub
 
             ''' <summary>
-            ''' ルールグラフをデバッグ出力します。
+            ''' ルールグラフをデバッグ出力します（内部実装）。
             ''' </summary>
             ''' <param name="out">出力先のテキストライター。</param>
             ''' <param name="arrivals">到達済みノード集合。</param>
             ''' <param name="node">現在のノード。</param>
-            Public Sub DebugRuleGraphPrint(out As TextWriter, arrivals As HashSet(Of RuleAnalysis), node As RuleAnalysis)
+            ''' <param name="indent">インデントレベル。</param>
+            Private Sub DebugRuleGraphPrint(out As TextWriter,
+                                            arrivals As HashSet(Of AnalysisNode),
+                                            node As AnalysisNode,
+                                            indent As Integer)
                 If Not arrivals.Contains(node) Then
                     arrivals.Add(node)
 
-                    out.Write($"node:{node} -> ")
-                    'For Each nextNode In node.Pattern
-                    '    out.Write($"{nextNode}, ")
-                    'Next
-                    'out.WriteLine()
+                    ' インデント出力
+                    Dim indentStr = New String(" "c, indent * 2)
 
-                    'For Each nextNode In node.Pattern
-                    '    If TypeOf nextNode.ToAnalysis Is CompletedAnalysis Then
-                    '        Continue For
-                    '    End If
-                    '    DebugRuleGraphPrint(out, arrivals, nextNode.ToAnalysis)
-                    'Next
+                    ' ノード情報
+                    out.Write($"{indentStr}・Node:{node.Id}")
+                    out.Write($" Type:{node.GetType().Name}")
+                    If node.Range.Enable Then
+                        out.Write($" Range:{node.Range}")
+                    End If
+
+                    ' 接続先
+                    If node.Routes.Count > 0 Then
+                        out.Write(" → [")
+                        out.Write(String.Join(", ", node.Routes.Select(Function(r) r.NextNode.Id.ToString())))
+                        out.Write("]")
+                    End If
+                    out.WriteLine()
+
+                    ' 再帰的に出力
+                    For Each route In node.Routes
+                        DebugRuleGraphPrint(out, arrivals, route.NextNode, indent + 1)
+                    Next
+                Else
+                    ' 既に訪問済みのノードは参照のみ表示
+                    Dim indentStr = New String(" "c, indent * 2)
+                    out.WriteLine($"{indentStr}・Node:{node.Id} (既出)")
                 End If
             End Sub
 

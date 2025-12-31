@@ -1,8 +1,6 @@
 ﻿Option Explicit On
 Option Strict On
 
-Imports ZoppaLibrary.BNF
-
 Namespace ABNF
 
     ''' <summary>

@@ -13,23 +13,20 @@ Namespace ABNF
     ''' <para>このクラスは解析グラフのノードを表現します。</para>
     ''' <para>主要なサブクラス:</para>
     ''' <list type="bullet">
+    ''' <item>EpsilonNode: ε遷移ノード（空遷移）</item>
     ''' <item>CharValNode: 文字リテラルのマッチング</item>
     ''' <item>NumValNode: 数値範囲のマッチング</item>
     ''' <item>RuleNameNode: ルール参照のマッチング</item>
     ''' <item>MethodNode: カスタムメソッドによるマッチング</item>
     ''' </list>
     ''' </remarks>
-    Public Class AnalysisNode
+    Public MustInherit Class AnalysisNode
 
         ''' <summary>識別値。</summary>
         Public ReadOnly Property Id As Integer
 
         ''' <summary>評価範囲。</summary>
-        Public Overridable ReadOnly Property Range As ExpressionRange
-            Get
-                Return ExpressionRange.Invalid
-            End Get
-        End Property
+        Public MustOverride ReadOnly Property Range As ExpressionRange
 
         ''' <summary>接続ルート。</summary>
         Public ReadOnly Property Routes As List(Of Route)
@@ -37,11 +34,7 @@ Namespace ABNF
         ''' <summary>
         ''' 再試行可能かを取得する。
         ''' </summary>
-        Public Overridable ReadOnly Property IsRetry As Boolean
-            Get
-                Return False
-            End Get
-        End Property
+        Public MustOverride ReadOnly Property IsRetry As Boolean
 
         ''' <summary>
         ''' コンストラクタ。
@@ -59,6 +52,15 @@ Namespace ABNF
         ''' <param name="id">ID。</param>
         ''' <param name="range">評価範囲。</param>
         ''' <returns>生成されたインスタンス。</returns>
+        ''' <remarks>
+        ''' 式の型に応じて以下のサブクラスを返します:
+        ''' <list type="bullet">
+        ''' <item><see cref="CharValExpression"/> → <see cref="CharValNode"/></item>
+        ''' <item><see cref="NumValExpression"/> → <see cref="NumValNode"/></item>
+        ''' <item><see cref="RuleNameExpression"/> → <see cref="RuleNameNode"/></item>
+        ''' <item>その他 → <see cref="EpsilonNode"/> (空ノード)</item>
+        ''' </list>
+        ''' </remarks>
         Public Shared Function Create(id As Integer, range As ExpressionRange) As AnalysisNode
             Select Case range.Expr?.GetType()
                 Case GetType(CharValExpression)
@@ -68,7 +70,7 @@ Namespace ABNF
                 Case GetType(RuleNameExpression)
                     Return New RuleNameNode(id, range)
                 Case Else
-                    Return New AnalysisNode(id)
+                    Return New EpsilonNode(id)
             End Select
         End Function
 
@@ -126,11 +128,9 @@ Namespace ABNF
         ''' success: マッチが成功した場合にTrue。
         ''' answer: 解析結果アイテム。
         ''' </returns>
-        Public Overridable Function Match(tr As PositionAdjustBytes,
-                                          env As ABNFEnvironment,
-                                          ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
-            Return (True, Nothing)
-        End Function
+        Public MustOverride Function Match(tr As PositionAdjustBytes,
+                                           env As ABNFEnvironment,
+                                           ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
 
         ''' <summary>
         ''' 次のパターンのマッチを試みる。
@@ -141,10 +141,8 @@ Namespace ABNF
         ''' success: マッチが成功した場合にTrue。
         ''' answer: 解析結果アイテム。
         ''' </returns>
-        Public Overridable Function MoveNext(tr As PositionAdjustBytes,
-                                             env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
-            Return (False, Nothing)
-        End Function
+        Public MustOverride Function MoveNext(tr As PositionAdjustBytes,
+                                              env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
 
         ''' <summary>
         ''' 文字列表現を取得する。

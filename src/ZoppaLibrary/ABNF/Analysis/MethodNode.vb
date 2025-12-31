@@ -11,15 +11,23 @@ Namespace ABNF
     NotInheritable Class MethodNode
         Inherits AnalysisNode
 
-        ''' <summary>
-        ''' メソッド。
-        ''' </summary>
+        ''' <summary>メソッドを取得します。</summary>
         Private ReadOnly _method As Func(Of PositionAdjustBytes, Boolean)
 
-        ''' <summary>
-        ''' 名前を取得します。
-        ''' </summary>
+        ''' <summary>名前を取得します。</summary>
         Public ReadOnly Property Name As String
+
+        ''' <summary>評価範囲を取得します。</summary>
+        Public Overrides ReadOnly Property Range As ExpressionRange
+
+        ''' <summary>
+        ''' 再試行可能かを取得する。
+        ''' </summary>
+        Public Overrides ReadOnly Property IsRetry As Boolean
+            Get
+                Return False
+            End Get
+        End Property
 
         ''' <summary>
         ''' コンストラクタ。
@@ -57,6 +65,20 @@ Namespace ABNF
                 snapPos.Restore()
                 Return (False, Nothing)
             End If
+        End Function
+
+        ''' <summary>
+        ''' 次のパターンのマッチを試みる。
+        ''' </summary>
+        ''' <param name="tr">位置調整バイト列。</param>
+        ''' <param name="env">ABNF環境。</param>
+        ''' <returns>
+        ''' success: マッチが成功した場合にTrue。
+        ''' answer: 解析結果アイテム。
+        ''' </returns>
+        Public Overrides Function MoveNext(tr As PositionAdjustBytes,
+                                           env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+            Return (False, Nothing)
         End Function
 
     End Class

@@ -21,6 +21,15 @@ Namespace ABNF
         Public Overrides ReadOnly Property Range As ExpressionRange
 
         ''' <summary>
+        ''' 再試行可能かを取得する。
+        ''' </summary>
+        Public Overrides ReadOnly Property IsRetry As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
+        ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="id">ノードID。</param>
@@ -73,6 +82,20 @@ Namespace ABNF
                 End If
             Next
             Return True
+        End Function
+
+        ''' <summary>
+        ''' 次のパターンのマッチを試みる。
+        ''' </summary>
+        ''' <param name="tr">位置調整バイト列。</param>
+        ''' <param name="env">ABNF環境。</param>
+        ''' <returns>
+        ''' success: マッチが成功した場合にTrue。
+        ''' answer: 解析結果アイテム。
+        ''' </returns>
+        Public Overrides Function MoveNext(tr As PositionAdjustBytes,
+                                           env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+            Return (False, Nothing)
         End Function
 
     End Class

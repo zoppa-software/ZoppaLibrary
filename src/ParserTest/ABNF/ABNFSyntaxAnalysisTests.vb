@@ -256,6 +256,11 @@ subscriber = 4num"
         ' Arrange
         Dim input = "repeat-rule = 1*3DIGIT"
         Dim env = ABNFSyntaxAnalysis.CompileEnvironment(New PositionAdjustString(input))
+        Dim strBuffer As New Text.StringBuilder()
+        Using sw As New IO.StringWriter(strBuffer)
+            env.DebugRuleGraphPrint(sw)
+        End Using
+        Dim s = strBuffer.ToString()
 
         Dim ans2 = env.Evaluate("repeat-rule", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("12")))
         Assert.Equal(New Byte() {&H31, &H32}, ans2.GetBytes())
