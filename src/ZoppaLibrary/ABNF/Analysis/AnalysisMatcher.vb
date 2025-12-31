@@ -17,7 +17,8 @@ Namespace ABNF
         ''' <summary>最大スタック深度。</summary>
         Private Const MaxStackDepth As Integer = 10000
 
-        ''' <summary>実用的な量詞上限。</summary>
+        ''' <summary>実用的な量詞上限（メモリ枯渇防止のため）。</summary>
+        ''' <remarks>無制限量詞(*)に対して適用される現実的な上限値</remarks>
         Private Const PracticalQuantifierLimit As Integer = 10000
 
         ''' <summary>遡りアクション。</summary>
@@ -44,7 +45,7 @@ Namespace ABNF
         Private ReadOnly _stack As New Stack(Of StackState)()
 
         ''' <summary>到達回数記録。</summary>
-        Private ReadOnly _arrived As New SortedDictionary(Of Integer, Integer)()
+        Private ReadOnly _arrived As New Dictionary(Of Integer, Integer)()
 
         ''' <summary>
         ''' コンストラクタ。
@@ -70,8 +71,7 @@ Namespace ABNF
                 Return Me.Tracking(Me._root, 0, tr, env)
             Else
                 ' 継続解析
-                Dim cur = Me._stack.Pop()
-                Me.DecrementArrived(cur.ToNode.Id)
+                Dim cur = Me.PopStack()
                 tr.Seek(cur.StartPosition)
                 Return Me.Tracking(cur.FromNode, cur.Route, tr, env)
             End If
@@ -92,8 +92,7 @@ Namespace ABNF
                 Return Me.Tracking(Me._root, 0, tr, env)
             Else
                 ' 継続解析
-                Dim cur = Me._stack.Pop()
-                Me.DecrementArrived(cur.ToNode.Id)
+                Dim cur = Me.PopStack()
                 tr.Seek(cur.StartPosition)
                 Return Me.Tracking(cur.FromNode, cur.Route + 1, tr, env)
             End If
@@ -106,12 +105,14 @@ Namespace ABNF
         ''' <param name="route">現在のルート番号。</param>
         ''' <param name="tr">位置調整リーダー。</param>
         ''' <param name="env">解析環境。</param>
-        ''' <returns>解析が成功した場合に True を返します。</returns>
+        ''' <returns>
+        ''' 解析が成功した場合に True を返します。
+        ''' shift パラメータは将来の拡張用で、現在は常に0を返します。
+        ''' </returns>
         Private Function Tracking(node As AnalysisNode,
                                   route As Integer,
                                   tr As PositionAdjustBytes,
                                   env As ABNFEnvironment) As (success As Boolean, shift As Integer)
-            Dim startPosition = tr.Position
             Dim iterationCount As Integer = 0
             Dim currentPosition = tr.Position
             Dim action As BacktrackAction
@@ -119,11 +120,11 @@ Namespace ABNF
             Do
                 iterationCount += 1
                 If iterationCount > MaxIterations Then
-                    Throw New ABNFException($"解析が最大反復回数({MaxIterations})を超過しました。無限ループの可能性があります。")
+                    Throw New ABNFException($"解析が最大反復回数({MaxIterations})を超過しました。無限ループの可能性があります。ルール:{Me._ruleName} 位置:{currentPosition}")
                 End If
 
                 If Me._stack.Count > MaxStackDepth Then
-                    Throw New ABNFException($"解析スタックが最大深度({MaxStackDepth})を超過しました。")
+                    Throw New ABNFException($"解析スタックが最大深度({MaxStackDepth})を超過しました。ルール:{Me._ruleName} 位置:{currentPosition}")
                 End If
 
                 ' ルートを順次試行、一致を確認
@@ -149,9 +150,8 @@ Namespace ABNF
                     ' 対象ノードが一致するか判定
                     Dim matched = nextNode.Match(tr, env, Me._ruleName)
                     If matched.success Then
-                        ' 次のノードへ進む
-                        Me._stack.Push(New StackState(node, nextNode, route, currentPosition, tr.Position, matched.answer))
-                        Me.IncrementArrived(nextNode.Id)
+                        ' 評価をスタックに保存
+                        Me.PushStack(node, nextNode, route, currentPosition, matched.answer)
 
                         ' 最終ノードに到達した場合は成功
                         If nextNode.Routes.Count = 0 Then
@@ -174,17 +174,19 @@ Namespace ABNF
                     ' ノードを遡る
                     Dim backtrack = Me.BacktrackNode(route, tr, env)
 
-                    ' 追跡状態を取得
-                    action = backtrack.Action
-                    node = backtrack.Node
-                    route = backtrack.Route
-                    currentPosition = backtrack.Position
+                    Select Case backtrack.Action
+                        Case BacktrackAction.ExitTracking
+                            ' 追跡終了の場合は失敗
+                            Return (False, 0)
+                        Case Else
+                            ' 上記以外は継続
+                            action = backtrack.Action
+                            node = backtrack.Node
+                            route = backtrack.Route
+                            currentPosition = backtrack.Position
+                    End Select
                 Loop While action = BacktrackAction.RetryMoveNext
-
             Loop While action = BacktrackAction.RetryMatch
-
-            ' 全てのルートを試行したがマッチしなかった場合は失敗
-            Return (False, 0)
         End Function
 
         ''' <summary>
@@ -213,30 +215,29 @@ Namespace ABNF
                 Dim selectedRoute = route
                 Dim currentPosition = tr.Position
 
-                ' ひとつ前のノード、位置へ戻る
-                Dim preview = Me._stack.Pop()
-                Dim selectedNode = preview.FromNode
-                Me.DecrementArrived(preview.ToNode.Id)
+                ' ひとつ前の評価を取得
+                Dim preview = Me.PopStack()
                 tr.Seek(preview.StartPosition)
 
-                ' リトライを試みる
+                ' 再評価を行い、どのように遡るか判断する
+                ' 1. 現在のノード（ひとつ前の次のノード）のリトライを実施し、リトライ成功の場合は現在のノードの最初のルートから再開
+                ' 2. 現在のノードの選択肢が存在する場合は次の選択肢へ
+                ' 3. 選択肢が存在しない、かつリトライ可能な場合はリトライへ
                 Dim retry = preview.ToNode.MoveNext(tr, env)
                 If retry.success Then
-                    ' リトライ成功の場合はそのまま進む
-                    Me._stack.Push(New StackState(preview.FromNode, preview.ToNode, preview.Route, preview.StartPosition, tr.Position, retry.answer))
-                    Me.IncrementArrived(preview.ToNode.Id)
+                    ' 1. リトライ成功の場合は現在のノードの最初のルートから再開
+                    Me.PushStack(preview.FromNode, preview.ToNode, preview.Route, preview.StartPosition, retry.answer)
                     Return New TrackingState(BacktrackAction.RetryMatch, preview.ToNode, 0, tr.Position)
 
-                ElseIf preview.Route + 1 < selectedNode.Routes.Count Then
-                    ' 選択肢が存在する場合は次の選択肢へ
-                    Return New TrackingState(BacktrackAction.RetryMatch, selectedNode, preview.Route + 1, preview.StartPosition)
+                ElseIf preview.Route + 1 < preview.FromNode.Routes.Count Then
+                    ' 2. 選択肢が存在する場合は次の選択肢へ
+                    Return New TrackingState(BacktrackAction.RetryMatch, preview.FromNode, preview.Route + 1, preview.StartPosition)
 
                 Else
-                    ' 選択肢が存在しない、かつリトライ可能な場合はリトライへ
-                    ' そうでない場合は終了
+                    ' 3. 選択肢が存在しない、かつリトライ可能な場合はリトライへ。そうでない場合は終了
                     currentPosition = preview.StartPosition
-                    If preview.ToNode.IsRetry Then
-                        Return New TrackingState(BacktrackAction.RetryMoveNext, selectedNode, selectedRoute, tr.Position)
+                    If preview.FromNode.IsRetry Then
+                        Return New TrackingState(BacktrackAction.RetryMoveNext, preview.FromNode, selectedRoute, tr.Position)
                     Else
                         Return New TrackingState(BacktrackAction.ExitTracking, Nothing, 0, 0)
                     End If
@@ -246,6 +247,26 @@ Namespace ABNF
                 Return New TrackingState(BacktrackAction.ExitTracking, Nothing, 0, 0)
             End If
         End Function
+
+        ''' <summary>
+        ''' 解析スタックに要素をプッシュする。
+        ''' </summary>
+        ''' <param name="fromNode">開始ノード。</param>
+        ''' <param name="toNode">終了ノード。</param>
+        ''' <param name="route">ルート番号。</param>
+        ''' <param name="startPosition">開始位置。</param>
+        ''' <param name="answer">解析結果。</param>
+        Private Sub PushStack(fromNode As AnalysisNode,
+                              toNode As AnalysisNode,
+                              route As Integer,
+                              startPosition As Integer,
+                              answer As ABNFAnalysisItem)
+            ' スタックに要素をプッシュする。
+            Me._stack.Push(New StackState(fromNode, toNode, route, startPosition, answer))
+
+            ' 到達回数をインクリメント
+            Me.IncrementArrived(toNode.Id)
+        End Sub
 
         ''' <summary>
         ''' 指定ノードの訪問回数をインクリメントする。
@@ -261,15 +282,21 @@ Namespace ABNF
         End Sub
 
         ''' <summary>
-        ''' 指定ノードの訪問回数をデクリメントする。
+        ''' 解析スタックから要素をポップする。
         ''' </summary>
-        ''' <param name="nodeId">ノードID。</param>
-        Private Sub DecrementArrived(nodeId As Integer)
-            Me._arrived(nodeId) -= 1
-            If Me._arrived(nodeId) <= 0 Then
-                Me._arrived.Remove(nodeId)
+        ''' <returns>ポップしたスタック要素。</returns>
+        Private Function PopStack() As StackState
+            ' 解析スタックから要素をポップする。
+            Dim item = Me._stack.Pop()
+
+            ' 到達回数をデクリメント
+            Me._arrived(item.ToNode.Id) -= 1
+            If Me._arrived(item.ToNode.Id) <= 0 Then
+                Me._arrived.Remove(item.ToNode.Id)
             End If
-        End Sub
+
+            Return item
+        End Function
 
         ''' <summary>
         ''' 指定ノードの訪問回数を取得する。
@@ -277,7 +304,9 @@ Namespace ABNF
         ''' <param name="nodeId">ノードID。</param>
         ''' <returns>訪問回数。</returns>
         Private Function GetArrived(nodeId As Integer) As Integer
-            Return If(Me._arrived.ContainsKey(nodeId), Me._arrived(nodeId), 0)
+            Dim count As Integer = 0
+            Me._arrived.TryGetValue(nodeId, count)
+            Return count
         End Function
 
         ''' <summary>
@@ -285,10 +314,12 @@ Namespace ABNF
         ''' </summary>
         ''' <returns>解析結果リスト。</returns>
         Public Function GetAnswer() As List(Of ABNFAnalysisItem) Implements IAnalysisMatcher.GetAnswer
+            ' 解析スタックが空の場合は空リストを返す
             If Me._stack.Count = 0 Then
                 Return New List(Of ABNFAnalysisItem)()
             End If
 
+            ' 解析スタックから解析結果を収集する
             Dim res As New List(Of ABNFAnalysisItem)(Me._stack.Count)
             For Each item In Me._stack
                 If item.Answer IsNot Nothing Then
@@ -332,13 +363,11 @@ Namespace ABNF
             ''' <param name="toNode">終了ノード。</param>
             ''' <param name="route">ルート番号。</param>
             ''' <param name="startPosition">開始位置。</param>
-            ''' <param name="endPosition">終了位置。</param>
             ''' <param name="answer">解析結果。</param>
             Public Sub New(fromNode As AnalysisNode,
                            toNode As AnalysisNode,
                            route As Integer,
                            startPosition As Integer,
-                           endPosition As Integer,
                            answer As ABNFAnalysisItem)
                 Me.FromNode = fromNode
                 Me.ToNode = toNode
@@ -360,7 +389,7 @@ Namespace ABNF
         ''' <summary>追跡状態。</summary>
         Private Structure TrackingState
 
-            ''' <summary>対象のノードを取得します。</summary>
+            ''' <summary>バックトラックアクションを取得します。</summary>
             Public ReadOnly Property Action As BacktrackAction
 
             ''' <summary>対象ノードを取得します。</summary>

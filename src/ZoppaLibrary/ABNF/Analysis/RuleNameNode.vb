@@ -53,7 +53,10 @@ Namespace ABNF
         ''' <param name="tr">位置調整バイト列。</param>
         ''' <param name="env">ABNF環境。</param>
         ''' <param name="ruleName">ルール名。</param>
-        ''' <returns>マッチ結果。</returns>
+        ''' <returns>
+        ''' success: マッチが成功した場合にTrue。
+        ''' answer: 解析結果アイテム。
+        ''' </returns>
         Public Overrides Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
             Dim snapPos = tr.MemoryPosition()
 
@@ -76,9 +79,12 @@ Namespace ABNF
         ''' 次のパターンのマッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param
-        ''' <returns>マッチ結果。</returns>
-        Public Overrides Function MoveNext(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, isRetry As Boolean, answer As ABNFAnalysisItem)
+        ''' <param name="env">ABNF環境。</param>
+        ''' <returns>
+        ''' success: マッチが成功した場合にTrue。
+        ''' answer: 解析結果アイテム。
+        ''' </returns>
+        Public Overrides Function MoveNext(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
             ' 現在位置のマッチャーを取得
             Dim position = tr.Position
             Dim matcher = Me.GetMatcher(position, env)
@@ -86,10 +92,10 @@ Namespace ABNF
             ' 次のパターンのマッチを試みる
             Dim res = matcher.MoveNext(tr, env)
             If res.success Then
-                Return (True, True, New ABNFAnalysisItem(Me._ruleName, matcher.GetAnswer(), tr, position, tr.Position))
+                Return (True, New ABNFAnalysisItem(Me._ruleName, matcher.GetAnswer(), tr, position, tr.Position))
             Else
                 Me._matchers.Remove(position)
-                Return (False, True, Nothing)
+                Return (False, Nothing)
             End If
         End Function
 

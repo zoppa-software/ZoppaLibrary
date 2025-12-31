@@ -7,8 +7,18 @@ Imports ZoppaLibrary.BNF
 Namespace ABNF
 
     ''' <summary>
-    ''' ABNF解析ノード。
+    ''' ABNF解析ノード基底クラス。
     ''' </summary>
+    ''' <remarks>
+    ''' <para>このクラスは解析グラフのノードを表現します。</para>
+    ''' <para>主要なサブクラス:</para>
+    ''' <list type="bullet">
+    ''' <item>CharValNode: 文字リテラルのマッチング</item>
+    ''' <item>NumValNode: 数値範囲のマッチング</item>
+    ''' <item>RuleNameNode: ルール参照のマッチング</item>
+    ''' <item>MethodNode: カスタムメソッドによるマッチング</item>
+    ''' </list>
+    ''' </remarks>
     Public Class AnalysisNode
 
         ''' <summary>識別値。</summary>
@@ -112,7 +122,10 @@ Namespace ABNF
         ''' <param name="tr">位置調整バイト列。</param>
         ''' <param name="env">ABNF環境。</param>
         ''' <param name="ruleName">ルール名。</param>
-        ''' <returns>マッチ結果。</returns>
+        ''' <returns>
+        ''' success: マッチが成功した場合にTrue。
+        ''' answer: 解析結果アイテム。
+        ''' </returns>
         Public Overridable Function Match(tr As PositionAdjustBytes,
                                           env As ABNFEnvironment,
                                           ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
@@ -123,11 +136,14 @@ Namespace ABNF
         ''' 次のパターンのマッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param
-        ''' <returns>マッチ結果。</returns>
+        ''' <param name="env">ABNF環境。</param>
+        ''' <returns>
+        ''' success: マッチが成功した場合にTrue。
+        ''' answer: 解析結果アイテム。
+        ''' </returns>
         Public Overridable Function MoveNext(tr As PositionAdjustBytes,
-                                             env As ABNFEnvironment) As (success As Boolean, isRetry As Boolean, answer As ABNFAnalysisItem)
-            Return (False, False, Nothing)
+                                             env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+            Return (False, Nothing)
         End Function
 
         ''' <summary>
@@ -138,7 +154,7 @@ Namespace ABNF
             Dim buf As New StringBuilder()
             For Each n In Me.Routes
                 If buf.Length > 0 Then buf.Append(", ")
-                buf.Append($"{n.NextNode.Id}({n.RequiredVisits},{n.LimitedVisits})")
+                buf.Append($"{If(n.NextNode?.Id.ToString(), "")}({n.RequiredVisits},{n.LimitedVisits})")
             Next
             Return $"{Me.Id} {Me.Range} -> {buf}"
         End Function
