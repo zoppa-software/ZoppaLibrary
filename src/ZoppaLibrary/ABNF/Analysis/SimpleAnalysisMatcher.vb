@@ -98,7 +98,13 @@ Namespace ABNF
         ''' </summary>
         ''' <returns>解析結果リスト。</returns>
         Public Function GetAnswer() As List(Of ABNFAnalysisItem) Implements IAnalysisMatcher.GetAnswer
-            Return Me._answer
+            Dim res As New List(Of ABNFAnalysisItem)()
+            For Each item In Me._answer
+                If item IsNot Nothing Then
+                    res.Add(item)
+                End If
+            Next
+            Return res
         End Function
 
     End Class

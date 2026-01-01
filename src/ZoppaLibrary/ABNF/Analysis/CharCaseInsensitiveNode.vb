@@ -1,15 +1,17 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.CodeDom.Compiler
+Imports System.Globalization
 Imports System.Text
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF
 
     ''' <summary>
-    ''' 文字値ノード。
+    ''' 文字値ノード（大文字、小文字を区別しない）
     ''' </summary>
-    NotInheritable Class CharValNode
+    NotInheritable Class CharCaseInsensitiveNode
         Inherits AnalysisNode
 
         ''' <summary>
@@ -36,7 +38,7 @@ Namespace ABNF
         ''' <param name="range">式範囲。</param>
         Public Sub New(id As Integer, range As ExpressionRange)
             MyBase.New(id)
-            Me._literal = Encoding.UTF8.GetBytes(range.SubRanges(0).ToString().ToLower())
+            Me._literal = Encoding.UTF8.GetBytes(range.SubRanges(0).ToString())
             Me.Range = range
         End Sub
 
@@ -79,25 +81,12 @@ Namespace ABNF
                 Return False
             End If
             For i As Integer = 0 To literal.Length - 1
-                If literal(i) <> ToLowerChar(read(i)) Then
+                If literal(i) <> read(i) Then
                     unmatched = i
                     Return False
                 End If
             Next
             Return True
-        End Function
-
-        ''' <summary>
-        ''' 指定されたバイトを小文字に変換する。
-        ''' </summary>
-        ''' <param name="c">変換対象のバイト。</param>
-        ''' <returns>小文字に変換されたバイト。</returns>
-        Private Shared Function ToLowerChar(c As Byte) As Byte
-            If c >= AscW("A"c) AndAlso c <= AscW("Z"c) Then
-                Return CByte((c - AscW("A"c)) + AscW("a"c))
-            Else
-                Return c
-            End If
         End Function
 
         ''' <summary>

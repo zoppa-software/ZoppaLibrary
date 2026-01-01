@@ -129,7 +129,7 @@ Namespace ABNF
             End Select
 
             ' 失敗情報を設定
-            env.SetFailureInformation(ruleName, tr, startPos, Me.Range)
+            env.SetFailureInformation(ruleName, tr, tr.Position, Me.Range)
 
             ' 一致しない場合は偽を返す
             snapPos.Restore()

@@ -290,4 +290,34 @@ subscriber = 4num"
         )
     End Sub
 
+    <Fact>
+    Public Sub Literal_Match()
+        Dim input = "literal = ""ABC"""
+        Dim env = ABNFSyntaxAnalysis.CompileEnvironment(input)
+
+        Dim ans1 = env.Evaluate("literal", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("abc")))
+        Assert.Equal(New Byte() {&H61, &H62, &H63}, ans1.GetBytes())
+
+        Dim ans2 = env.Evaluate("literal", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("Abc")))
+        Assert.Equal(New Byte() {&H41, &H62, &H63}, ans2.GetBytes())
+    End Sub
+
+    <Fact>
+    Public Sub Literal_Match_2()
+        Dim input = "literal = %s""ABC"""
+        Dim env = ABNFSyntaxAnalysis.CompileEnvironment(input)
+
+        Dim ans1 = env.Evaluate("literal", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("ABC")))
+        Assert.Equal(New Byte() {&H41, &H42, &H43}, ans1.GetBytes())
+
+        Try
+            env.Evaluate("literal", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("Abc")))
+            Assert.True(False, "Expected exception was not thrown.")
+        Catch ex As ABNFException
+            Dim a As Integer = 0
+        Catch ex As Exception
+            Assert.True(False, $"Unexpected exception type: {ex.GetType().FullName}")
+        End Try
+    End Sub
+
 End Class

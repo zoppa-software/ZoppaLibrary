@@ -27,10 +27,8 @@ Namespace ABNF
             Dim startPos = tr.Position
             Dim ranges As New List(Of ExpressionRange)()
 
-            ' 開始文字はDQUOTE
-            If tr.Peek() = AscW(""""c) Then
-                tr.Read()
-            Else
+            ' 文字リテラル開始の判定
+            If Not TryParseStringStart(tr) Then
                 snap.Restore()
                 Return ExpressionRange.Invalid
             End If
@@ -61,6 +59,39 @@ Namespace ABNF
             ' マッチした範囲を返す
             ranges.Add(New ExpressionRange(Me, tr, inStart, inEnd, ExpressionRange.EmptyRanges))
             Return New ExpressionRange(Me, tr, startPos, tr.Position, ranges)
+        End Function
+
+        ''' <summary>
+        ''' 文字リテラルの開始部分を解析します。
+        ''' </summary>
+        ''' <param name="tr">位置調整リーダー。</param>
+        ''' <returns>開始部分が見つかった場合に True を返します。</returns>
+        Private Function TryParseStringStart(tr As IPositionAdjustReader) As Boolean
+            If tr.Peek() = AscW(""""c) Then
+                tr.Read()
+                Return True
+            ElseIf tr.Peek() = AscW("%"c) Then
+                Return TryParseCaseInsensitiveStart(tr)
+            Else
+                Return False
+            End If
+        End Function
+
+        ''' <summary>
+        ''' 大文字・小文字を区別しない文字リテラルの開始部分を解析します。
+        ''' </summary>
+        ''' <param name="tr">位置調整リーダー。</param>
+        ''' <returns>開始部分が見つかった場合に True を返します。</returns>
+        Private Function TryParseCaseInsensitiveStart(tr As IPositionAdjustReader) As Boolean
+            tr.Read() ' '%'
+            If tr.Peek() = AscW("s"c) Then
+                tr.Read()
+                If tr.Peek() = AscW(""""c) Then
+                    tr.Read()
+                    Return True
+                End If
+            End If
+            Return False
         End Function
 
     End Class

@@ -64,7 +64,13 @@ Namespace ABNF
         Public Shared Function Create(id As Integer, range As ExpressionRange) As AnalysisNode
             Select Case range.Expr?.GetType()
                 Case GetType(CharValExpression)
-                    Return New CharValNode(id, range)
+                    If range.SubChar(0) = """"c Then
+                        ' 大文字小文字を区別する場合
+                        Return New CharValNode(id, range)
+                    Else
+                        ' 大文字小文字を区別しない場合
+                        Return New CharCaseInsensitiveNode(id, range)
+                    End If
                 Case GetType(NumValExpression)
                     Return New NumValNode(id, range)
                 Case GetType(RuleNameExpression)
