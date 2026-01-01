@@ -1,6 +1,7 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.IO
 Imports ZoppaLibrary.BNF
 
 Namespace ABNF
@@ -142,6 +143,35 @@ Namespace ABNF
 
             Return strBuilder.ToString().TrimEnd()
         End Function
+
+        ''' <summary>
+        ''' 解析結果をツリー出力します。
+        ''' </summary>
+        ''' <param name="out">出力先のテキストライター。</param>
+        Public Sub PrintAnalysisTree(out As TextWriter)
+            If out Is Nothing Then
+                Throw New ArgumentNullException(NameOf(out))
+            End If
+            PrintAnalysisTreeImpl(out, Me)
+        End Sub
+
+        ''' <summary>
+        ''' 解析結果をツリー出力します。（内部実装）
+        ''' </summary>
+        ''' <param name="out">出力先のテキストライター。</param>
+        ''' <param name="item">現在の解析範囲。</param>
+        ''' <param name="linkIndent">リンクのインデント。</param>
+        ''' <param name="spaceIndent">スペースのインデント。</param>
+        Private Shared Sub PrintAnalysisTreeImpl(out As TextWriter, item As ABNFAnalysisItem, Optional linkIndent As String = "", Optional spaceIndent As String = "")
+            Dim data = If(item.End - item.Start <= 50 OrElse item.SubRanges.Count = 0, $": {item}", "")
+            out.WriteLine($"{linkIndent} {item.Identifier} {item.Start}-{item.End}{data}")
+            If item.SubRanges.Count > 0 Then
+                For i As Integer = 0 To item.SubRanges.Count - 2
+                    PrintAnalysisTreeImpl(out, item.SubRanges(i), spaceIndent & "├─", spaceIndent & "│ ")
+                Next
+                PrintAnalysisTreeImpl(out, item.SubRanges(item.SubRanges.Count - 1), spaceIndent & "└─", spaceIndent & "  ")
+            End If
+        End Sub
 
         ''' <summary>
         ''' バイト列の列挙子。

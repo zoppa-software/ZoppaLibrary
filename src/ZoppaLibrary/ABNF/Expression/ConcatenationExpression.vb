@@ -31,12 +31,17 @@ Namespace ABNF
                 Dim nextSnap = tr.MemoryPosition()
 
                 ' コメントまたは空白
-                ABNFCommentWspExpr.Match(tr)
+                Dim comment = ABNFCommentWspExpr.Match(tr)
 
                 ' 次の式を取得
-                Dim nextRange = ABNFRepeatExpr.Match(tr)
-                If nextRange.Enable Then
-                    mths.Add(nextRange)
+                If Not comment.Enable Then
+                    Dim nextRange = ABNFRepeatExpr.Match(tr)
+                    If nextRange.Enable Then
+                        mths.Add(nextRange)
+                    Else
+                        nextSnap.Restore()
+                        Exit Do
+                    End If
                 Else
                     nextSnap.Restore()
                     Exit Do

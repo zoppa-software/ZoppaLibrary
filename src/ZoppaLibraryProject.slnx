@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="C:/Users/tiinii/source/repos/ZoppaLibraryProject/ZoppaLibraryProject/ZoppaLibraryProject.vbproj" />
+  <Project Path="ABNFSample/ABNFSample.vbproj" Id="d4031295-822d-4994-ad23-827e6df1db7e" />
   <Project Path="DynamicTextTest/DynamicTextTest.vbproj" Id="c575a4ab-0b85-4839-a6bf-65a79d7c52c2" />
   <Project Path="ParserTest/ParserTest.vbproj" Id="9e15d6c3-784f-4467-b201-d5d311bc5f64" />
   <Project Path="TomlTest/TomlTest.vbproj" Id="2aa0ce53-6478-4337-9fc4-b0c316ad8a5d" />
