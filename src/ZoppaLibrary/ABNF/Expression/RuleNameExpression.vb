@@ -7,7 +7,7 @@ Namespace ABNF
 
     ''' <summary>
     ''' ルール名を表します。
-    ''' rulename = ALPHA *(ALPHA / DIGIT / "-")
+    ''' rulename = ALPHA *(ALPHA / DIGIT / "-" / "_")
     ''' </summary>
     NotInheritable Class RuleNameExpression
         Implements IExpression
@@ -36,13 +36,14 @@ Namespace ABNF
                 Return ExpressionRange.Invalid
             End If
 
-            ' 続く文字はALPHA / DIGIT / "-" 0回以上
+            ' 続く文字はALPHA / DIGIT / "-" / "_" 0回以上
             Do While True
                 Dim ch = tr.Peek()
-                If (ch >= AscW("A") AndAlso ch <= AscW("Z")) OrElse
-                   (ch >= AscW("a") AndAlso ch <= AscW("z")) OrElse
-                   (ch >= AscW("0") AndAlso ch <= AscW("9")) OrElse
-                   ch = AscW("-") Then
+                If (ch >= AscW("A"c) AndAlso ch <= AscW("Z"c)) OrElse
+                   (ch >= AscW("a"c) AndAlso ch <= AscW("z"c)) OrElse
+                   (ch >= AscW("0"c) AndAlso ch <= AscW("9"c)) OrElse
+                   ch = AscW("-"c) OrElse
+                   ch = AscW("_"c) Then
                     tr.Read()
                 Else
                     Exit Do

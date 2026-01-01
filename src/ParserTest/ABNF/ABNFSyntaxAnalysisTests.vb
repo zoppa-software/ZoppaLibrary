@@ -320,4 +320,22 @@ subscriber = 4num"
         End Try
     End Sub
 
+    <Fact>
+    Public Sub Literal_Match_3()
+        Dim input = "num-val = %x61.62.63"
+        Dim env = ABNFSyntaxAnalysis.CompileEnvironment(input)
+
+        Dim ans1 = env.Evaluate("num-val", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("abc")))
+        Assert.Equal(New Byte() {&H61, &H62, &H63}, ans1.GetBytes())
+
+        Try
+            env.Evaluate("num-val", New PositionAdjustBytes(Text.Encoding.UTF8.GetBytes("Abc")))
+            Assert.True(False, "Expected exception was not thrown.")
+        Catch ex As ABNFException
+            Dim a As Integer = 0
+        Catch ex As Exception
+            Assert.True(False, $"Unexpected exception type: {ex.GetType().FullName}")
+        End Try
+    End Sub
+
 End Class
