@@ -64,6 +64,7 @@ Namespace EBNF
                 exceptMarcher.ClearCache()
                 Dim exceptRes = exceptMarcher.Match(tr, env)
                 If Not exceptRes.success Then
+                    exceptSnap.Restore()
                     Return (True, New EBNFAnalysisItem("literal", New List(Of EBNFAnalysisItem), tr, startPos, tr.Position))
                 End If
             End If
@@ -87,6 +88,14 @@ Namespace EBNF
         ''' </returns>
         Public Overrides Function MoveNext(tr As IPositionAdjustReader, env As EBNFEnvironment) As (success As Boolean, answer As EBNFAnalysisItem)
             Return (False, Nothing)
+        End Function
+
+        ''' <summary>
+        ''' 文字列表現を取得する。
+        ''' </summary>
+        ''' <returns>文字列表現。</returns>
+        Public Overrides Function ToString() As String
+            Return $"Exclusive:{Me._groupExpr}-{Me._exceptExpr}"
         End Function
 
     End Class

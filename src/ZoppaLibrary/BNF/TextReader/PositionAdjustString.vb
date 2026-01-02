@@ -128,7 +128,8 @@ Namespace BNF
         ''' <param name="length">長さ。</param>
         ''' <returns>取得した部分文字列。</returns>
         Public Function Substring(startIndex As Integer, length As Integer) As String Implements IPositionAdjustReader.Substring
-            Return Me._source.Substring(startIndex, length)
+            Dim ln = Math.Min(length, Me._source.Length - startIndex)
+            Return Me._source.Substring(startIndex, ln)
         End Function
 
         ''' <summary>

@@ -196,7 +196,7 @@ Namespace EBNF
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         <Extension()>
-        Public Function Evaluate(env As EBNFEnvironment, ident As String, target As IPositionAdjustReader) As EBNFAnalysisItem
+        Public Function Evaluate2(env As EBNFEnvironment, ident As String, target As IPositionAdjustReader) As EBNFAnalysisItem
             If env.RuleTable.ContainsKey(ident) Then
                 Dim startPos = target.Position
                 Dim answers As New List(Of EBNFAnalysisItem)()
@@ -223,7 +223,7 @@ Namespace EBNF
         ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
         ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
         <Extension()>
-        Public Function Evaluate(env As EBNFEnvironment, ident As String, target As String) As EBNFAnalysisItem
+        Public Function Evaluate2(env As EBNFEnvironment, ident As String, target As String) As EBNFAnalysisItem
             Return Evaluate(env, ident, New PositionAdjustStringReader(target))
         End Function
 
@@ -570,7 +570,7 @@ Namespace EBNF
         ''' <summary>
         ''' 構文解析環境を表します。
         ''' </summary>
-        Public NotInheritable Class EBNFEnvironment
+        Public NotInheritable Class EBNFEnvironment2
 
             ''' <summary>
             ''' 特殊メソッドテーブル。
@@ -687,30 +687,30 @@ Namespace EBNF
                 'Next
             End Sub
 
-            ''' <summary>
-            ''' ルールグラフをデバッグ出力します。
-            ''' </summary>
-            ''' <param name="out">出力先のテキストライター。</param>
-            ''' <param name="arrivals">到達済みノード集合。</param>
-            ''' <param name="node">現在のノード。</param>
-            Public Sub DebugRuleGraphPrint(out As TextWriter, arrivals As HashSet(Of IAnalysis), node As IAnalysis)
-                If Not arrivals.Contains(node) Then
-                    arrivals.Add(node)
+            '''' <summary>
+            '''' ルールグラフをデバッグ出力します。
+            '''' </summary>
+            '''' <param name="out">出力先のテキストライター。</param>
+            '''' <param name="arrivals">到達済みノード集合。</param>
+            '''' <param name="node">現在のノード。</param>
+            'Public Sub DebugRuleGraphPrint(out As TextWriter, arrivals As HashSet(Of IAnalysis), node As IAnalysis)
+            '    If Not arrivals.Contains(node) Then
+            '        arrivals.Add(node)
 
-                    out.Write($"node:{node} -> ")
-                    For Each nextNode In node.Pattern
-                        out.Write($"{nextNode}, ")
-                    Next
-                    out.WriteLine()
+            '        out.Write($"node:{node} -> ")
+            '        For Each nextNode In node.Pattern
+            '            out.Write($"{nextNode}, ")
+            '        Next
+            '        out.WriteLine()
 
-                    For Each nextNode In node.Pattern
-                        If TypeOf nextNode Is CompletedAnalysis Then
-                            Continue For
-                        End If
-                        DebugRuleGraphPrint(out, arrivals, nextNode)
-                    Next
-                End If
-            End Sub
+            '        For Each nextNode In node.Pattern
+            '            If TypeOf nextNode Is CompletedAnalysis Then
+            '                Continue For
+            '            End If
+            '            DebugRuleGraphPrint(out, arrivals, nextNode)
+            '        Next
+            '    End If
+            'End Sub
 
         End Class
 

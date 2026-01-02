@@ -47,7 +47,7 @@ Namespace EBNF
             ' ルートを作成
             Dim nodes As New NodeList()
             Dim startNode = nodes.NewNode()
-            Dim routes = CreateRoute(nodes, targets)
+            Dim routes = CreateRoute(nodes, targets, True)
             Dim endNode = nodes.NewNode()
 
             startNode.Routes.Add(routes.st)
@@ -109,14 +109,15 @@ Namespace EBNF
         ''' </summary>
         ''' <param name="nodes">ノードリスト。</param>
         ''' <param name="target">式の範囲。</param>
+        ''' <param name="isLast">最後のルートか。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function CreateRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+        Private Shared Function CreateRoute(nodes As NodeList, target As ExpressionRange, isLast As Boolean) As (st As Node, ed As Node)
             Select Case target.Expr.GetType()
                 Case GetType(AlternationExpression)
                     ' 選択式
                     Return If(target.SubRanges.Count > 1,
                               AlternationRoute(nodes, target),
-                              CreateRoute(nodes, target.SubRanges(0)))
+                              CreateRoute(nodes, target.SubRanges(0), False))
 
                 Case GetType(CharacterExpression)
                     ' 文字式
@@ -126,24 +127,24 @@ Namespace EBNF
                     ' 連結式
                     Return If(target.SubRanges.Count > 1,
                               ConcatenationRoute(nodes, target),
-                              CreateRoute(nodes, target.SubRanges(0)))
+                              CreateRoute(nodes, target.SubRanges(0), False))
 
                 Case GetType(FactorExpression)
                     ' 要素式
                     If target.SubRanges.Count > 1 Then
                         Select Case target.SubRanges(1).ToString()
                             Case "?"c
-                                Return ZeroOrOneRoute(nodes, target.SubRanges(0))
+                                Return ZeroOrOneRoute(nodes, target.SubRanges(0), isLast)
                             Case "*"c
-                                Return ZeroOrMoreRoute(nodes, target.SubRanges(0))
+                                Return ZeroOrMoreRoute(nodes, target.SubRanges(0), isLast)
                             Case "+"c
-                                Return OneOrMoreRoute(nodes, target.SubRanges(0))
+                                Return OneOrMoreRoute(nodes, target.SubRanges(0), isLast)
                             Case Else
                                 ' 否定式
                                 Return DirectRoute(nodes, target)
                         End Select
                     Else
-                        Return CreateRoute(nodes, target.SubRanges(0))
+                        Return CreateRoute(nodes, target.SubRanges(0), False)
                     End If
 
                 Case GetType(IdentifierExpression)
@@ -158,15 +159,15 @@ Namespace EBNF
                     ' 終端式
                     Select Case target.SubRanges(0).Expr.GetType()
                         Case GetType(TerminalExpression), GetType(IdentifierExpression)
-                            Return CreateRoute(nodes, target.SubRanges(0))
+                            Return CreateRoute(nodes, target.SubRanges(0), False)
                         Case Else
                             Select Case target.SubChar(0)
                                 Case "["c
-                                    Return ZeroOrOneRoute(nodes, target.SubRanges(0))
+                                    Return ZeroOrOneRoute(nodes, target.SubRanges(0), isLast)
                                 Case "{"c
-                                    Return ZeroOrMoreRoute(nodes, target.SubRanges(0))
+                                    Return ZeroOrMoreRoute(nodes, target.SubRanges(0), isLast)
                                 Case Else
-                                    Return CreateRoute(nodes, target.SubRanges(0))
+                                    Return CreateRoute(nodes, target.SubRanges(0), False)
                             End Select
                     End Select
 
@@ -207,7 +208,7 @@ Namespace EBNF
 
             ' 開始点と終了点の間に選択肢を接続
             For Each subRange In target.SubRanges
-                Dim subRoute = CreateRoute(nodes, subRange)
+                Dim subRoute = CreateRoute(nodes, subRange, False)
                 startNode.Routes.Add(subRoute.st)
                 subRoute.ed.Routes.Add(endNode)
             Next
@@ -222,11 +223,11 @@ Namespace EBNF
         ''' <returns>接続点。</returns>
         Private Shared Function ConcatenationRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
             ' 最初のルートを作成
-            Dim curNode = CreateRoute(nodes, target.SubRanges(0))
+            Dim curNode = CreateRoute(nodes, target.SubRanges(0), False)
 
             ' それ以降のルートを連結
             For i As Integer = 1 To target.SubRanges.Count - 1
-                Dim subRoute = CreateRoute(nodes, target.SubRanges(i))
+                Dim subRoute = CreateRoute(nodes, target.SubRanges(i), False)
                 curNode.ed.Routes.Add(subRoute.st)
                 curNode = (curNode.st, subRoute.ed)
             Next
@@ -239,9 +240,9 @@ Namespace EBNF
         ''' <param name="nodes">ノードリスト。</param>
         ''' <param name="target">式の範囲。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function ZeroOrOneRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+        Private Shared Function ZeroOrOneRoute(nodes As NodeList, target As ExpressionRange, isLast As Boolean) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
-            Dim midRoute = CreateRoute(nodes, target)
+            Dim midRoute = CreateRoute(nodes, target, False)
             Dim endNode = nodes.NewNode()
 
             ' 開始点から中間点、中間点から終了点、開始点から終了点へ接続
@@ -258,9 +259,9 @@ Namespace EBNF
         ''' <param name="nodes">ノードリスト。</param>
         ''' <param name="target">式の範囲。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function ZeroOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+        Private Shared Function ZeroOrMoreRoute(nodes As NodeList, target As ExpressionRange, isLast As Boolean) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
-            Dim midRoute = CreateRoute(nodes, target)
+            Dim midRoute = CreateRoute(nodes, target, False)
             Dim endNode1 = nodes.NewNode()
             Dim endNode2 = nodes.NewNode()
 
@@ -269,8 +270,13 @@ Namespace EBNF
             startNode.Routes.Add(endNode2)
 
             ' 中間点から終了点へ接続
-            midRoute.ed.Routes.Add(endNode2)
-            midRoute.ed.Routes.Add(endNode1)
+            If isLast Then
+                midRoute.ed.Routes.Add(endNode1)
+                midRoute.ed.Routes.Add(endNode2)
+            Else
+                midRoute.ed.Routes.Add(endNode2)
+                midRoute.ed.Routes.Add(endNode1)
+            End If
 
             ' 終了点から開始点へ接続（ループ）
             endNode1.Routes.Add(startNode)
@@ -284,9 +290,9 @@ Namespace EBNF
         ''' <param name="nodes">ノードリスト。</param>
         ''' <param name="target">式の範囲。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function OneOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+        Private Shared Function OneOrMoreRoute(nodes As NodeList, target As ExpressionRange, isLast As Boolean) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
-            Dim midRoute = CreateRoute(nodes, target)
+            Dim midRoute = CreateRoute(nodes, target, False)
             Dim endNode1 = nodes.NewNode()
             Dim endNode2 = nodes.NewNode()
 
@@ -294,8 +300,13 @@ Namespace EBNF
             startNode.Routes.Add(midRoute.st)
 
             ' 中間点から終了点へ接続
-            midRoute.ed.Routes.Add(endNode2)
-            midRoute.ed.Routes.Add(endNode1)
+            If isLast Then
+                midRoute.ed.Routes.Add(endNode1)
+                midRoute.ed.Routes.Add(endNode2)
+            Else
+                midRoute.ed.Routes.Add(endNode2)
+                midRoute.ed.Routes.Add(endNode1)
+            End If
 
             ' 終了点から開始点へ接続（ループ）
             endNode1.Routes.Add(startNode)

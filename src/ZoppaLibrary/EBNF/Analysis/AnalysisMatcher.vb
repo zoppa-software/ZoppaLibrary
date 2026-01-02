@@ -1,12 +1,14 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports System.IO
+Imports System.Text
 Imports ZoppaLibrary.BNF
 
 Namespace EBNF
 
     ''' <summary>
-    ''' ABNF 解析マッチャー。
+    ''' EBNF 解析マッチャー。
     ''' </summary>
     Public NotInheritable Class AnalysisMatcher
         Implements IAnalysisMatcher
@@ -39,6 +41,9 @@ Namespace EBNF
 
         ''' <summary>解析スタック。</summary>
         Private ReadOnly _stack As New Stack(Of StackState)()
+
+        ''' <summary>直前の結果。</summary>
+        Private _previewValue As (startPosition As Integer, endPosition As Integer) = (-1, 0)
 
         ''' <summary>
         ''' コンストラクタ。
@@ -103,6 +108,7 @@ Namespace EBNF
                                   tr As IPositionAdjustReader,
                                   env As EBNFEnvironment) As (success As Boolean, shift As Integer)
             Dim iterationCount As Integer = 0
+            Dim startPosition = tr.Position
             Dim currentPosition = tr.Position
             Dim action As BacktrackAction
 
@@ -128,6 +134,24 @@ Namespace EBNF
 
                         ' 最終ノードに到達した場合は成功
                         If nextNode.Routes.Count = 0 Then
+                            If Me._previewValue.startPosition = startPosition AndAlso
+                               Me._previewValue.endPosition = tr.Position Then
+                                Return (False, 0)
+                            End If
+
+                            'Dim msg As New StringBuilder()
+                            'msg.Append($"({startPosition}) {Me._ruleName}:")
+                            'Dim stk = New List(Of StackState)(Me._stack)
+                            'stk.Reverse()
+                            'For Each nd In stk
+                            '    msg.Append($" {nd.ToNode.Id} ->")
+                            'Next
+                            'msg.Append($" : ")
+                            'For Each nd In stk
+                            '    msg.Append($"{nd.Answer}")
+                            'Next
+                            'Debug.WriteLine(msg.ToString())
+                            Me._previewValue = (startPosition, tr.Position)
                             Return (True, 0)
                         End If
 
@@ -136,6 +160,10 @@ Namespace EBNF
                         node = nextNode
                         route = 0
                     Else
+                        'Dim msg As New StringBuilder()
+                        'msg.Append($"({currentPosition}) {Me._ruleName} unmatch:{nextNode} str:{tr.Substring(currentPosition, 1)}")
+                        'Debug.WriteLine(msg.ToString())
+
                         ' ノードが一致しなかった場合は次のルートへ
                         route += 1
                         tr.Seek(currentPosition)

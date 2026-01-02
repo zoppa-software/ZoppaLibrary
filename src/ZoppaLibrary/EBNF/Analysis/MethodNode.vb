@@ -83,6 +83,14 @@ Namespace EBNF
             Return (False, Nothing)
         End Function
 
+        ''' <summary>
+        ''' 文字列表現を取得する。
+        ''' </summary>
+        ''' <returns>文字列表現。</returns>
+        Public Overrides Function ToString() As String
+            Return $"Method:{Me._Name}"
+        End Function
+
     End Class
 
 End Namespace

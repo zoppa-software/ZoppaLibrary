@@ -33,10 +33,10 @@ Namespace ABNF
         ''' Dim result = CompileToEvaluater(rules, "expr", target)
         ''' </code>
         ''' </example>
-        Public Function CompileToEvaluater(rules As String,
-                                           ident As String,
-                                           target As PositionAdjustBytes,
-                                           Optional addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))) = Nothing) As ABNFAnalysisItem
+        Public Function CompileToEvaluate(rules As String,
+                                          ident As String,
+                                          target As PositionAdjustBytes,
+                                          Optional addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))) = Nothing) As ABNFAnalysisItem
             Dim env = CompileEnvironment(rules, addSpecMethods)
             Return env.Evaluate(ident, target)
         End Function
@@ -49,10 +49,10 @@ Namespace ABNF
         ''' <param name="target">解析対象の位置調整リーダー。</param>
         ''' <param name="addSpecMethods">特殊メソッドを追加するためのデリゲート。</param>
         ''' <returns>解析結果を表す <see cref="ABNFAnalysisItem"/>。</returns>
-        Public Function CompileToEvaluater(rules As IPositionAdjustReader,
-                                           ident As String,
-                                           target As PositionAdjustBytes,
-                                           Optional addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))) = Nothing) As ABNFAnalysisItem
+        Public Function CompileToEvaluate(rules As IPositionAdjustReader,
+                                          ident As String,
+                                          target As PositionAdjustBytes,
+                                          Optional addSpecMethods As Action(Of SortedDictionary(Of String, Func(Of PositionAdjustBytes, Boolean))) = Nothing) As ABNFAnalysisItem
             Dim env = CompileEnvironment(rules, addSpecMethods)
             Return env.Evaluate(ident, target)
         End Function
