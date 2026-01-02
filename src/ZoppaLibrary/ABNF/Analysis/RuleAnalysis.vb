@@ -47,7 +47,7 @@ Namespace ABNF
             ' ルートを作成
             Dim nodes As New NodeList()
             Dim startNode = nodes.NewNode()
-            Dim routes = CreateRoute(nodes, targets)
+            Dim routes = CreateRoute(nodes, targets, True)
             Dim endNode = nodes.NewNode()
 
             startNode.Routes.Add(routes.st)
@@ -109,14 +109,17 @@ Namespace ABNF
         ''' </summary>
         ''' <param name="nodes">ノードリスト。</param>
         ''' <param name="target">式の範囲。</param>
+        ''' <param name="isLast">最後のルートか。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function CreateRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+        Private Shared Function CreateRoute(nodes As NodeList,
+                                            target As ExpressionRange,
+                                            isLast As Boolean) As (st As Node, ed As Node)
             Select Case target.Expr.GetType()
                 Case GetType(AlternationExpression)
                     ' 選択式
                     Return If(target.SubRanges.Count > 1,
                               AlternationRoute(nodes, target),
-                              CreateRoute(nodes, target.SubRanges(0)))
+                              CreateRoute(nodes, target.SubRanges(0), False))
 
                 Case GetType(CharValExpression)
                     ' 文字式
@@ -126,15 +129,15 @@ Namespace ABNF
                     ' 連結式
                     Return If(target.SubRanges.Count > 1,
                               ConcatenationRoute(nodes, target),
-                              CreateRoute(nodes, target.SubRanges(0)))
+                              CreateRoute(nodes, target.SubRanges(0), False))
 
                 Case GetType(GroupExpression)
                     ' グループ式
-                    Return CreateRoute(nodes, target.SubRanges(0))
+                    Return CreateRoute(nodes, target.SubRanges(0), False)
 
                 Case GetType(OptionExpression)
                     ' オプション式
-                    Return RangeRoute(nodes, target.SubRanges(0), 0, 1)
+                    Return RangeRoute(nodes, target.SubRanges(0), 0, 1, isLast)
 
                 Case GetType(RepetitionExpression)
                     ' 反復式
@@ -145,9 +148,9 @@ Namespace ABNF
                         Dim minCount = If(minRange.Enable, Integer.Parse(minRange.ToString()), 0)
                         Dim maxCount = If(maxRange.Enable, Integer.Parse(maxRange.ToString()), Integer.MaxValue)
 
-                        Return RangeRoute(nodes, target.SubRanges(1), minCount, maxCount)
+                        Return RangeRoute(nodes, target.SubRanges(1), minCount, maxCount, isLast)
                     Else
-                        Return CreateRoute(nodes, target.SubRanges(0))
+                        Return CreateRoute(nodes, target.SubRanges(0), False)
                     End If
 
                 Case GetType(RuleNameExpression)
@@ -195,7 +198,7 @@ Namespace ABNF
 
             ' 開始点と終了点の間に選択肢を接続
             For Each subRange In target.SubRanges
-                Dim subRoute = CreateRoute(nodes, subRange)
+                Dim subRoute = CreateRoute(nodes, subRange, False)
                 startNode.Routes.Add(subRoute.st)
                 subRoute.ed.Routes.Add(endNode)
             Next
@@ -210,11 +213,11 @@ Namespace ABNF
         ''' <returns>接続点。</returns>
         Private Shared Function ConcatenationRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
             ' 最初のルートを作成
-            Dim curNode = CreateRoute(nodes, target.SubRanges(0))
+            Dim curNode = CreateRoute(nodes, target.SubRanges(0), False)
 
             ' それ以降のルートを連結
             For i As Integer = 1 To target.SubRanges.Count - 1
-                Dim subRoute = CreateRoute(nodes, target.SubRanges(i))
+                Dim subRoute = CreateRoute(nodes, target.SubRanges(i), False)
                 curNode.ed.Routes.Add(subRoute.st)
                 curNode = (curNode.st, subRoute.ed)
             Next
@@ -228,10 +231,15 @@ Namespace ABNF
         ''' <param name="target">式の範囲。</param>
         ''' <param name="minCount">最小回数。</param>
         ''' <param name="maxCount">最大回数。</param>
+        ''' <param name="isLast">最後のルートか。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function RangeRoute(nodes As NodeList, target As ExpressionRange, minCount As Integer, maxCount As Integer) As (st As Node, ed As Node)
+        Private Shared Function RangeRoute(nodes As NodeList,
+                                           target As ExpressionRange,
+                                           minCount As Integer,
+                                           maxCount As Integer,
+                                           isLast As Boolean) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
-            Dim midRoute = CreateRoute(nodes, target)
+            Dim midRoute = CreateRoute(nodes, target, False)
             Dim endNode1 = nodes.NewNode()
             Dim endNode2 = nodes.NewNode()
 
@@ -246,8 +254,13 @@ Namespace ABNF
             End If
 
             ' 中間点から終了点へ接続
-            midRoute.ed.Routes.Add(endNode2)
-            midRoute.ed.Routes.Add(endNode1)
+            If isLast Then
+                midRoute.ed.Routes.Add(endNode1)
+                midRoute.ed.Routes.Add(endNode2)
+            Else
+                midRoute.ed.Routes.Add(endNode2)
+                midRoute.ed.Routes.Add(endNode1)
+            End If
 
             ' 終了点から開始点へ接続（ループ）
             If maxCount > 1 Then

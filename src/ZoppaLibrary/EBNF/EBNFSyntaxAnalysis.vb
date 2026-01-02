@@ -4,6 +4,7 @@ Option Strict On
 Imports System.IO
 Imports System.Runtime.CompilerServices
 Imports System.Text
+Imports System.Xml.Schema
 Imports ZoppaLibrary.BNF
 
 Namespace EBNF
@@ -241,6 +242,107 @@ Namespace EBNF
             Return Nothing  ' 到達しないが、コンパイラ警告回避
         End Function
 
+        ''' <summary>
+        ''' 指定された識別子、解析対象に基づいて検索を実行します。
+        ''' </summary>
+        ''' <param name="env">構文解析環境。</param>
+        ''' <param name="ident">解析を開始する識別子。</param>
+        ''' <param name="target">解析対象を表す <see cref="IPositionAdjustReader"/>。</param>
+        ''' <param name="searchStart">検索を開始する位置。</param>
+        ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
+        ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
+        <Extension()>
+        Public Function Search(env As EBNFEnvironment,
+                               ident As String,
+                               target As IPositionAdjustReader,
+                               Optional searchStart As Integer = 0) As (start As Integer, length As Integer)
+            ' 引数チェック
+            If String.IsNullOrWhiteSpace(ident) Then
+                Throw New ArgumentException("識別子が空です。", NameOf(ident))
+            End If
+
+            If target Is Nothing Then
+                Throw New ArgumentNullException(NameOf(target))
+            End If
+
+            ' ルールの存在確認
+            If Not env.RuleTable.ContainsKey(ident) Then
+                Throw New EBNFException($"指定された識別子 '{ident}' はルールに存在しません。")
+            End If
+
+            Dim startPos = target.Position
+            Dim matcher = env.RuleTable(ident).GetMatcher()
+            matcher.ClearCache()
+
+            ' 全パターンを試行
+            Do While target.Peek() <> -1
+                Dim res = matcher.MoveNext(target, env)
+
+                If res.success Then
+                    ' 成功
+                    env.Answer = New EBNFAnalysisItem(ident, matcher.GetAnswer(), target, startPos, target.Position)
+                    Return (startPos, env.Answer.End - env.Answer.Start)
+                Else
+                    target.Seek(startPos + 1)
+                    startPos = target.Position
+                End If
+            Loop
+
+            Return (-1, 0)
+
+
+
+
+
+
+            'If env.RuleTable.ContainsKey(ident) Then
+            '    ' 検索開始位置を移動
+            '    target.Seek(searchStart)
+
+            '    Dim answers As New List(Of EBNFAnalysisItem)()
+            '    Dim startPos = target.Position
+
+            '    ' 検索を実行
+            '    Do While target.Peek() <> -1
+            '        Dim shift As Integer = Integer.MaxValue
+
+            '        'For Each evalExpr In env.RuleTable(ident).Pattern
+            '        '    answers.Clear()
+            '        '    Dim res = evalExpr.Match(target, env, env.RuleTable, env.MethodTable, ident, answers)
+            '        '    If res.sccess Then
+            '        '        env.Answer = New EBNFAnalysisItem(ident, answers, target, startPos, target.Position)
+            '        '        Return startPos
+            '        '    ElseIf res.shift < shift Then
+            '        '        shift = If(res.shift > 0, res.shift, 1)
+            '        '    End If
+            '        'Next
+
+            '        target.Seek(startPos + shift)
+            '        startPos = target.Position
+            '    Loop
+
+            '    Return -1
+            'Else
+            '    Throw New EBNFException($"指定された識別子 '{ident}' はルールに存在しません。")
+            'End If
+        End Function
+
+        ''' <summary>
+        ''' 指定された識別子、解析対象に基づいて検索を実行します。
+        ''' </summary>
+        ''' <param name="env">構文解析環境。</param>
+        ''' <param name="ident">解析を開始する識別子。</param>
+        ''' <param name="target">解析対象を表す文字列。</param>
+        ''' <param name="searchStart">検索を開始する位置。</param>
+        ''' <returns>解析結果を表す <see cref="EBNFEnvironment"/>。</returns>
+        ''' <exception cref="ArgumentException">指定された識別子がルールに存在しない場合。</exception>
+        <Extension()>
+        Public Function Search(env As EBNFEnvironment,
+                               ident As String,
+                               target As String,
+                               Optional searchStart As Integer = 0) As (start As Integer, length As Integer)
+            Return Search(env, ident, New PositionAdjustStringReader(target))
+        End Function
 
 #Region "特殊メソッド"
 

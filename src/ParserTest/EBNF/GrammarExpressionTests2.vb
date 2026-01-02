@@ -28,8 +28,8 @@ Public Class GrammarExpressionTests2
             End Sub
         )
 
-        Dim ans2 = OldEBNFSyntaxAnalysis.Search(compiled, "grammar", "123abcd456")
-        Assert.Equal(3, ans2)
+        Dim ans2 = EBNFSyntaxAnalysis.Search(compiled, "grammar", "123abcd456")
+        Assert.Equal(3, ans2.start)
         Assert.Equal("abcd", compiled.Answer.ToString())
     End Sub
 
@@ -54,7 +54,7 @@ ident = ? Not Space ?+;
 grammar = 'UPDATE', S, ident, S, 'SET';"
 
         Dim compiled = EBNFSyntaxAnalysis.CompileEnvironment(pattern)
-        Dim ans1 = OldEBNFSyntaxAnalysis.Search(compiled, "grammar", input)
+        Dim ans1 = EBNFSyntaxAnalysis.Search(compiled, "grammar", input)
         Assert.Equal("UPDATE テーブル名
  SET", compiled.Answer.ToString())
         Assert.Equal("テーブル名", compiled.Answer("ident").ToString())
@@ -81,8 +81,8 @@ ident = ? All Char ?+;
 grammar = 'UPDATE', S, ident, S, 'SET';"
 
         Dim compiled = EBNFSyntaxAnalysis.CompileEnvironment(pattern)
-        Dim ans1 = OldEBNFSyntaxAnalysis.Search(compiled, "grammar", input)
-        Assert.Equal(-1, ans1)
+        Dim ans1 = EBNFSyntaxAnalysis.Search(compiled, "grammar", input)
+        Assert.Equal(106, ans1.start)
     End Sub
 
 End Class

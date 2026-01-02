@@ -47,6 +47,9 @@ Namespace ABNF
         ''' <summary>到達回数記録。</summary>
         Private ReadOnly _arrived As New Dictionary(Of Integer, Integer)()
 
+        ''' <summary>直前の結果。</summary>
+        Private _previewValue As (startPosition As Integer, endPosition As Integer) = (-1, 0)
+
         ''' <summary>
         ''' コンストラクタ。
         ''' </summary>
@@ -114,6 +117,7 @@ Namespace ABNF
                                   tr As PositionAdjustBytes,
                                   env As ABNFEnvironment) As (success As Boolean, shift As Integer)
             Dim iterationCount As Integer = 0
+            Dim startPosition = tr.Position
             Dim currentPosition = tr.Position
             Dim action As BacktrackAction
 
@@ -155,6 +159,10 @@ Namespace ABNF
 
                         ' 最終ノードに到達した場合は成功
                         If nextNode.Routes.Count = 0 Then
+                            If Me._previewValue.startPosition = startPosition AndAlso
+                               Me._previewValue.endPosition = tr.Position Then
+                                Return (False, 0)
+                            End If
                             Return (True, 0)
                         End If
 
