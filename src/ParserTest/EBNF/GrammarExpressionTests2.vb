@@ -19,15 +19,15 @@ Public Class GrammarExpressionTests2
             compiled.DebugRuleGraphPrint(writer)
         End Using
 
-        Dim ans1 = EBNFSyntaxAnalysis.Evaluate(compiled, "grammar", "abcd")
+        Dim ans1 = OldEBNFSyntaxAnalysis.Evaluate(compiled, "grammar", "abcd")
 
         Assert.Throws(Of EBNFException)(
             Sub()
-                EBNFSyntaxAnalysis.Evaluate(compiled, "grammar", "abad")
+                OldEBNFSyntaxAnalysis.Evaluate(compiled, "grammar", "abad")
             End Sub
         )
 
-        Dim ans2 = EBNFSyntaxAnalysis.Search(compiled, "grammar", "123abcd456")
+        Dim ans2 = OldEBNFSyntaxAnalysis.Search(compiled, "grammar", "123abcd456")
         Assert.Equal(3, ans2)
         Assert.Equal("abcd", compiled.Answer.ToString())
     End Sub
@@ -52,8 +52,8 @@ DELETE FROM テーブル名
 ident = ? Not Space ?+;
 grammar = 'UPDATE', S, ident, S, 'SET';"
 
-        Dim compiled = EBNFSyntaxAnalysis.CompileEnvironment(pattern)
-        Dim ans1 = EBNFSyntaxAnalysis.Search(compiled, "grammar", input)
+        Dim compiled = OldEBNFSyntaxAnalysis.CompileEnvironment(pattern)
+        Dim ans1 = OldEBNFSyntaxAnalysis.Search(compiled, "grammar", input)
         Assert.Equal("UPDATE テーブル名
  SET", compiled.Answer.ToString())
         Assert.Equal("テーブル名", compiled.Answer("ident").ToString())
@@ -79,8 +79,8 @@ DELETE FROM テーブル名
 ident = ? All Char ?+;
 grammar = 'UPDATE', S, ident, S, 'SET';"
 
-        Dim compiled = EBNFSyntaxAnalysis.CompileEnvironment(pattern)
-        Dim ans1 = EBNFSyntaxAnalysis.Search(compiled, "grammar", input)
+        Dim compiled = OldEBNFSyntaxAnalysis.CompileEnvironment(pattern)
+        Dim ans1 = OldEBNFSyntaxAnalysis.Search(compiled, "grammar", input)
         Assert.Equal(-1, ans1)
     End Sub
 

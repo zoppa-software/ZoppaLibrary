@@ -204,7 +204,7 @@ Namespace Analysis
         ''' リフレクションを使用してプライベートメソッド UnescapedString を呼び出します。
         ''' </summary>
         Private Function InvokeUnescapedString(input As String) As String
-            Dim methodInfo = GetType(TerminalAnalysis).GetMethod("UnescapedString",
+            Dim methodInfo = GetType(TerminalNode).GetMethod("UnescapedString",
                 System.Reflection.BindingFlags.NonPublic Or System.Reflection.BindingFlags.Static)
             Return CStr(methodInfo.Invoke(Nothing, New Object() {input}))
         End Function

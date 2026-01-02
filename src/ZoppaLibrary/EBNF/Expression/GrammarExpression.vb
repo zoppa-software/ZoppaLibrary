@@ -38,9 +38,6 @@ Namespace EBNF
                 ElseIf Not CommentExpr.Match(tr).Enable Then
                     Return ExpressionRange.Invalid
                 End If
-#If DEBUG Then
-                Debug.WriteLine($"Matched rule: {tr.Substring(ruleRange.[Start], ruleRange.[End] - ruleRange.[Start])}")
-#End If
 
                 ' 空白を読み進める
                 SpaceExpr.Match(tr)

@@ -1,21 +1,24 @@
 ﻿Option Explicit On
 Option Strict On
 
+Imports ZoppaLibrary.ABNF
+Imports ZoppaLibrary.ABNF.ABNFSyntaxAnalysis
+Imports ZoppaLibrary.Analysis
 Imports ZoppaLibrary.BNF
 
-Namespace ABNF
+Namespace EBNF
 
     ''' <summary>
-    ''' サブルール名ノード。
+    ''' 識別子ノード。
     ''' </summary>
-    NotInheritable Class RuleNameNode
+    NotInheritable Class IdentifierNode
         Inherits AnalysisNode
 
         ''' <summary>位置ごとのマッチャーキャッシュ。</summary>
         Private ReadOnly _matchers As New SortedDictionary(Of Integer, IAnalysisMatcher)()
 
         ''' <summary>ルール名。</summary>
-        Private ReadOnly _ruleName As String
+        Private ReadOnly _identName As String
 
         ''' <summary>評価範囲。</summary>
         Public Overrides ReadOnly Property Range As ExpressionRange
@@ -33,10 +36,10 @@ Namespace ABNF
         ''' コンストラクタ。
         ''' </summary>
         ''' <param name="id">ノードID。</param>
-        ''' <param name="range">式範囲。</param>
+        ''' <param name="range">評価範囲。</param>
         Public Sub New(id As Integer, range As ExpressionRange)
             MyBase.New(id)
-            Me._ruleName = range.ToString()
+            Me._identName = range.ToString()
             Me.Range = range
         End Sub
 
@@ -51,13 +54,13 @@ Namespace ABNF
         ''' マッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="env">EBNF環境。</param>
         ''' <param name="ruleName">ルール名。</param>
         ''' <returns>
         ''' success: マッチが成功した場合にTrue。
         ''' answer: 解析結果アイテム。
         ''' </returns>
-        Public Overrides Function Match(tr As PositionAdjustBytes, env As ABNFEnvironment, ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public Overrides Function Match(tr As IPositionAdjustReader, env As EBNFEnvironment, ruleName As String) As (success As Boolean, answer As EBNFAnalysisItem)
             Dim snapPos = tr.MemoryPosition()
 
             ' 現在位置のマッチャーを取得
@@ -67,7 +70,7 @@ Namespace ABNF
             ' マッチを試みる
             Dim res = matcher.Match(tr, env)
             If res.success Then
-                Return (True, New ABNFAnalysisItem(Me._ruleName, matcher.GetAnswer(), tr, position, tr.Position))
+                Return (True, New EBNFAnalysisItem(Me._identName, matcher.GetAnswer(), tr, position, tr.Position))
             Else
                 Me._matchers.Remove(position)
                 snapPos.Restore()
@@ -79,12 +82,12 @@ Namespace ABNF
         ''' 次のパターンのマッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="env">EBNF環境。</param>
         ''' <returns>
         ''' success: マッチが成功した場合にTrue。
         ''' answer: 解析結果アイテム。
         ''' </returns>
-        Public Overrides Function MoveNext(tr As PositionAdjustBytes, env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public Overrides Function MoveNext(tr As IPositionAdjustReader, env As EBNFEnvironment) As (success As Boolean, answer As EBNFAnalysisItem)
             ' 現在位置のマッチャーを取得
             Dim position = tr.Position
             Dim matcher = Me.GetMatcher(position, env)
@@ -92,7 +95,7 @@ Namespace ABNF
             ' 次のパターンのマッチを試みる
             Dim res = matcher.MoveNext(tr, env)
             If res.success Then
-                Return (True, New ABNFAnalysisItem(Me._ruleName, matcher.GetAnswer(), tr, position, tr.Position))
+                Return (True, New EBNFAnalysisItem(Me._identName, matcher.GetAnswer(), tr, position, tr.Position))
             Else
                 Me._matchers.Remove(position)
                 Return (False, Nothing)
@@ -103,20 +106,20 @@ Namespace ABNF
         ''' 指定位置のマッチャーを取得する。
         ''' </summary>
         ''' <param name="position">位置。</param>
-        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="env">EBNF環境。</param>
         ''' <returns>マッチャー。</returns>
-        Private Function GetMatcher(position As Integer, env As ABNFEnvironment) As IAnalysisMatcher
+        Private Function GetMatcher(position As Integer, env As EBNFEnvironment) As IAnalysisMatcher
             Dim iterator As IAnalysisMatcher
             If Me._matchers.ContainsKey(position) Then
                 iterator = Me._matchers(position)
-            ElseIf env.RuleTable.ContainsKey(Me._ruleName) Then
-                iterator = env.RuleTable(Me._ruleName).GetMatcher()
+            ElseIf env.RuleTable.ContainsKey(Me._identName) Then
+                iterator = env.RuleTable(Me._identName).GetMatcher()
                 Me._matchers.Add(position, iterator)
-            ElseIf env.MethodTable.ContainsKey(Me._ruleName) Then
-                iterator = New RuleAnalysis(Me._ruleName, env.MethodTable(Me._ruleName)).GetMatcher()
+            ElseIf env.MethodTable.ContainsKey(Me._identName) Then
+                iterator = New RuleAnalysis(Me._identName, env.MethodTable(Me._identName)).GetMatcher()
                 Me._matchers.Add(position, iterator)
             Else
-                Throw New KeyNotFoundException($"識別子 '{Me._ruleName}' はルールテーブルに存在しません。")
+                Throw New KeyNotFoundException($"識別子 '{Me._identName}' はルールテーブルに存在しません。")
             End If
             Return iterator
         End Function

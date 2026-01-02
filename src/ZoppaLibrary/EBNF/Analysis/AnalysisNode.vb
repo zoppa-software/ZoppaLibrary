@@ -2,23 +2,24 @@
 Option Strict On
 
 Imports System.Text
+Imports ZoppaLibrary.ABNF
+Imports ZoppaLibrary.ABNF.ABNFSyntaxAnalysis
 Imports ZoppaLibrary.BNF
 
-Namespace ABNF
+Namespace EBNF
 
     ''' <summary>
-    ''' ABNF解析ノード基底クラス。
+    ''' EBNF解析ノード基底クラス。
     ''' </summary>
     ''' <remarks>
     ''' <para>このクラスは解析グラフのノードを表現します。</para>
     ''' <para>主要なサブクラス:</para>
     ''' <list type="bullet">
-    ''' <item>EpsilonNode: ε遷移ノード（空遷移）</item>
-    ''' <item>CharValNode: 文字リテラルのマッチング</item>
-    ''' <item>CharCaseInsensitiveNode: 大文字小文字を区別しない文字リテラルのマッチング</item>
-    ''' <item>NumValNode: 数値範囲のマッチング</item>
-    ''' <item>RuleNameNode: ルール参照のマッチング</item>
-    ''' <item>MethodNode: カスタムメソッドによるマッチング</item>
+    ''' <item><see cref="ExclusiveNode"/>: 要素式ノード。</item>
+    ''' <item><see cref="SpecialSeqNode"/>: 特殊シーケンスノード。</item>
+    ''' <item><see cref="TerminalNode"/>: 終端記号ノード。</item>
+    ''' <item><see cref="IdentifierNode"/>: 識別子ノード。</item>
+    ''' <item><see cref="EpsilonNode"/>: 空ノード（ε遷移）。</item>
     ''' </list>
     ''' </remarks>
     Public MustInherit Class AnalysisNode
@@ -56,26 +57,25 @@ Namespace ABNF
         ''' <remarks>
         ''' 式の型に応じて以下のサブクラスを返します:
         ''' <list type="bullet">
-        ''' <item><see cref="CharValExpression"/> → <see cref="CharValNode"/></item>
-        ''' <item><see cref="NumValExpression"/> → <see cref="NumValNode"/></item>
-        ''' <item><see cref="RuleNameExpression"/> → <see cref="RuleNameNode"/></item>
+        ''' <item><see cref="FactorExpression"/> → <see cref="ExclusiveNode"/></item>
+        ''' <item><see cref="SpecialSeqExpression"/> → <see cref="SpecialSeqNode"/></item>
+        ''' <item><see cref="TerminalExpression"/> → <see cref="TerminalNode"/></item>
+        ''' <item><see cref="IdentifierExpression"/> → <see cref="IdentifierNode"/></item>
         ''' <item>その他 → <see cref="EpsilonNode"/> (空ノード)</item>
         ''' </list>
         ''' </remarks>
         Public Shared Function Create(id As Integer, range As ExpressionRange) As AnalysisNode
             Select Case range.Expr?.GetType()
-                Case GetType(CharValExpression)
-                    If range.SubChar(0) = """"c Then
-                        ' 大文字小文字を区別する場合
-                        Return New CharValNode(id, range)
-                    Else
-                        ' 大文字小文字を区別しない場合
-                        Return New CharCaseInsensitiveNode(id, range)
-                    End If
-                Case GetType(NumValExpression)
-                    Return New NumValNode(id, range)
-                Case GetType(RuleNameExpression)
-                    Return New RuleNameNode(id, range)
+                Case GetType(SpecialSeqExpression) ' 特殊式
+                    Return New SpecialSeqNode(id, range)
+                Case GetType(TerminalExpression) ' 終端記号
+                    Return New TerminalNode(id, range)
+                    'Return New NumValNode(id, range)
+                Case GetType(IdentifierExpression) ' 識別子式
+                    Return New IdentifierNode(id, range)
+                    'Return New RuleNameNode(id, range)
+                Case GetType(FactorExpression) ' 要素式
+                    Return New ExclusiveNode(id, range)
                 Case Else
                     Return New EpsilonNode(id)
             End Select
@@ -88,7 +88,7 @@ Namespace ABNF
         ''' <param name="name">名前。</param>
         ''' <param name="method">マッチ対象を判定する関数。</param>
         ''' <returns>生成されたインスタンス。</returns>
-        Public Shared Function Create(id As Integer, name As String, method As Func(Of PositionAdjustBytes, Boolean)) As AnalysisNode
+        Public Shared Function Create(id As Integer, name As String, method As Func(Of IPositionAdjustReader, Boolean)) As AnalysisNode
             Return New MethodNode(id, name, method)
         End Function
 
@@ -117,39 +117,35 @@ Namespace ABNF
         ''' ルートを追加する。
         ''' </summary>
         ''' <param name="nextNode">次のノード。</param>
-        ''' <param name="required">必要訪問回数。</param>
-        ''' <param name="limited">制限訪問回数。</param>
-        Public Sub AddRoute(nextNode As AnalysisNode,
-                            required As Integer,
-                            limited As Integer)
-            Me.Routes.Add(New Route(nextNode, required, limited))
+        Public Sub AddRoute(nextNode As AnalysisNode)
+            Me.Routes.Add(New Route(nextNode))
         End Sub
 
         ''' <summary>
         ''' マッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="env">EBNF環境。</param>
         ''' <param name="ruleName">ルール名。</param>
         ''' <returns>
         ''' success: マッチが成功した場合にTrue。
         ''' answer: 解析結果アイテム。
         ''' </returns>
-        Public MustOverride Function Match(tr As PositionAdjustBytes,
-                                           env As ABNFEnvironment,
-                                           ruleName As String) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public MustOverride Function Match(tr As IPositionAdjustReader,
+                                           env As EBNFEnvironment,
+                                           ruleName As String) As (success As Boolean, answer As EBNFAnalysisItem)
 
         ''' <summary>
         ''' 次のパターンのマッチを試みる。
         ''' </summary>
         ''' <param name="tr">位置調整バイト列。</param>
-        ''' <param name="env">ABNF環境。</param>
+        ''' <param name="env">EBNF環境。</param>
         ''' <returns>
         ''' success: マッチが成功した場合にTrue。
         ''' answer: 解析結果アイテム。
         ''' </returns>
-        Public MustOverride Function MoveNext(tr As PositionAdjustBytes,
-                                              env As ABNFEnvironment) As (success As Boolean, answer As ABNFAnalysisItem)
+        Public MustOverride Function MoveNext(tr As IPositionAdjustReader,
+                                              env As EBNFEnvironment) As (success As Boolean, answer As EBNFAnalysisItem)
 
         ''' <summary>
         ''' 文字列表現を取得する。
@@ -159,7 +155,7 @@ Namespace ABNF
             Dim buf As New StringBuilder()
             For Each n In Me.Routes
                 If buf.Length > 0 Then buf.Append(", ")
-                buf.Append($"{If(n.NextNode?.Id.ToString(), "")}({n.RequiredVisits},{n.LimitedVisits})")
+                buf.Append($"{If(n.NextNode?.Id.ToString(), "")}")
             Next
             Return $"{Me.Id} {Me.Range} -> {buf}"
         End Function
@@ -170,24 +166,13 @@ Namespace ABNF
             ''' <summary>次のノード。</summary>
             Public ReadOnly Property NextNode As AnalysisNode
 
-            ''' <summary>必要訪問回数。</summary>
-            Public ReadOnly Property RequiredVisits As Integer
-
-            ''' <summary>制限訪問回数。</summary>
-            Public ReadOnly Property LimitedVisits As Integer
-
             ''' <summary>コンストラクタ。</summary>
             ''' <param name="nextNode">次のノード。</param>
-            ''' <param name="required">必要訪問回数。</param>
-            ''' <param name="limited">制限訪問回数。</param>
-            Public Sub New(nextNode As AnalysisNode, required As Integer, limited As Integer)
+            Public Sub New(nextNode As AnalysisNode)
                 Me.NextNode = nextNode
-                Me.RequiredVisits = required
-                Me.LimitedVisits = limited
             End Sub
 
         End Structure
-
     End Class
 
 End Namespace

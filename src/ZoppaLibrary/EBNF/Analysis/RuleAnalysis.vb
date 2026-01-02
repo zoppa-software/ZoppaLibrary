@@ -9,7 +9,11 @@ Namespace EBNF
     ''' ルールのコンパイル済み式を表します。
     ''' </summary>
     Public NotInheritable Class RuleAnalysis
-        Implements IAnalysis
+
+        ''' <summary>
+        ''' 解析ノードのルート。
+        ''' </summary>
+        Private ReadOnly _root As AnalysisNode
 
         ''' <summary>
         ''' ルール名を取得する。
@@ -18,10 +22,19 @@ Namespace EBNF
         Public ReadOnly Property RuleName As String
 
         ''' <summary>
-        ''' ルールのパターンを取得する。
+        ''' 単純ルートか。
         ''' </summary>
-        ''' <returns>ルールのパターン。</returns>
-        Public ReadOnly Property Pattern As List(Of IAnalysis) Implements IAnalysis.Pattern
+        Private _isSimple As Boolean = True
+
+        ''' <summary>
+        ''' ルートの取得。
+        ''' </summary>
+        ''' <returns>ルート。</returns>
+        Public ReadOnly Property Routes As List(Of AnalysisNode.Route)
+            Get
+                Return Me._root.Routes
+            End Get
+        End Property
 
         ''' <summary>
         ''' コンストラクタ。
@@ -51,49 +64,43 @@ Namespace EBNF
             pattern.Add(endNode.Id, New NodeLink(endNode))
 
             ' 評価用グラフを作成
-            Dim links As New SortedDictionary(Of Integer, IAnalysis)()
+            ' 1. 評価ノードを作成
+            ' 2. ルートを接続
+            Dim analysis As New SortedDictionary(Of Integer, AnalysisNode)() ' 1
             For Each kvp In pattern
                 With kvp.Value.StartNode
-                    Dim ana As IAnalysis = Nothing
-                    If .Id = endNode.Id Then
-                        ana = CompletedAnalysis.Instance
-                    ElseIf .Id = startNode.Id Then
-                        ana = New BeginAnalysis(.Range)
-                    Else
-                        Select Case .Range.Expr.GetType()
-                            Case GetType(FactorExpression) ' 要素式
-                                ana = New FactorAnalysis(.Range)
-                            Case GetType(IdentifierExpression) ' 識別子式
-                                ana = New IdentifierAnalysis(.Range)
-                            Case GetType(SpecialSeqExpression) ' 特殊式
-                                ana = New SpecialSeqAnalysis(.Range)
-                            Case GetType(TerminalExpression) ' 終端記号
-                                ana = New TerminalAnalysis(.Range)
-                            Case Else
-                                Throw New NotSupportedException($"サポートされていない式タイプです: { .Range.Expr.GetType().FullName }")
-                        End Select
-                    End If
-                    links.Add(.Id, ana)
+                    Dim ana = AnalysisNode.Create(.Id, .Range)
+                    analysis.Add(ana.Id, ana)
                 End With
             Next
-            For Each kvp In pattern
-                For Each endNode In kvp.Value.EndNodes
-                    If links.ContainsKey(endNode.Id) Then
-                        links(kvp.Key).Pattern.Add(links(endNode.Id))
+            For Each kvp In pattern ' 2
+                For Each edge In kvp.Value.EndNodes
+                    If analysis.ContainsKey(edge.Id) Then
+                        analysis(kvp.Key).AddRoute(analysis(edge.Id))
                     End If
                 Next
             Next
 
-            Me.Pattern = links(startNode.Id).Pattern
+            Me._root = analysis(startNode.Id)
         End Sub
 
         ''' <summary>
-        ''' 文字列表現を取得する。
+        ''' コンストラクタ。
         ''' </summary>
-        ''' <returns>文字列表現。</returns>
-        Public Overrides Function ToString() As String
-            Return $"<{Me.RuleName}>"
-        End Function
+        ''' <param name="name">ルール名。</param>
+        ''' <param name="method">マッチ対象を判定する関数。</param>
+        Public Sub New(name As String, method As Func(Of IPositionAdjustReader, Boolean))
+            Me.RuleName = name
+
+            ' ルートを作成
+            Dim startNode = AnalysisNode.Create(0, ExpressionRange.Invalid)
+            Dim methodNode = AnalysisNode.Create(1, name, method)
+            Dim endNode = AnalysisNode.Create(2, ExpressionRange.Invalid)
+            startNode.AddRoute(methodNode)
+            methodNode.AddRoute(endNode)
+
+            Me._root = startNode
+        End Sub
 
 #Region "ルート作成"
 
@@ -254,15 +261,21 @@ Namespace EBNF
         Private Shared Function ZeroOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
             Dim midRoute = CreateRoute(nodes, target)
-            Dim endNode = nodes.NewNode()
+            Dim endNode1 = nodes.NewNode()
+            Dim endNode2 = nodes.NewNode()
 
             ' 開始点から中間点、中間点から終了点、開始点と終了点の相互へ接続
             startNode.Routes.Add(midRoute.st)
-            startNode.Routes.Add(endNode)
-            midRoute.ed.Routes.Add(endNode)
-            endNode.Routes.Add(startNode)
+            startNode.Routes.Add(endNode2)
 
-            Return (startNode, endNode)
+            ' 中間点から終了点へ接続
+            midRoute.ed.Routes.Add(endNode2)
+            midRoute.ed.Routes.Add(endNode1)
+
+            ' 終了点から開始点へ接続（ループ）
+            endNode1.Routes.Add(startNode)
+
+            Return (startNode, endNode2)
         End Function
 
         ''' <summary>
@@ -274,14 +287,20 @@ Namespace EBNF
         Private Shared Function OneOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
             Dim midRoute = CreateRoute(nodes, target)
-            Dim endNode = nodes.NewNode()
+            Dim endNode1 = nodes.NewNode()
+            Dim endNode2 = nodes.NewNode()
 
             ' 開始点から中間点、中間点から終了点、終了点から開始点へ接続
             startNode.Routes.Add(midRoute.st)
-            midRoute.ed.Routes.Add(endNode)
-            endNode.Routes.Add(startNode)
 
-            Return (startNode, endNode)
+            ' 中間点から終了点へ接続
+            midRoute.ed.Routes.Add(endNode2)
+            midRoute.ed.Routes.Add(endNode1)
+
+            ' 終了点から開始点へ接続（ループ）
+            endNode1.Routes.Add(startNode)
+
+            Return (startNode, endNode2)
         End Function
 
 #End Region
@@ -331,38 +350,50 @@ Namespace EBNF
 #End Region
 
         ''' <summary>
-        ''' 解析を実行する。
+        ''' マッチャーを取得する。
         ''' </summary>
-        ''' <param name="tr">位置調整リーダー。</param>
-        ''' <param name="env">解析環境。</param>
-        ''' <param name="ruleTable">ルール解析テーブル。</param>
-        ''' <param name="specialMethods">特殊メソッドテーブル。</param>
-        ''' <param name="ruleName">現在のルール名。</param>
-        ''' <param name="answers">解析結果のリスト。</param>
-        ''' <returns>解析が成功した場合に True を返します。</returns>
-        Public Function Match(tr As IPositionAdjustReader,
-                              env As EBNFEnvironment,
-                              ruleTable As SortedDictionary(Of String, RuleAnalysis),
-                              specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
-                              ruleName As String,
-                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
-            Dim snap = tr.MemoryPosition()
+        ''' <returns>マッチャー。</returns>
+        Public Function GetMatcher() As IAnalysisMatcher
+            Return If(
+                Me._isSimple,
+                CType(New SimpleAnalysisMatcher(Me._root, Me.RuleName), IAnalysisMatcher),
+                New AnalysisMatcher(Me._root, Me.RuleName)
+            )
+        End Function
 
-            ' ルールパターンを順に評価
-            Dim shift As Integer = Integer.MaxValue
-            For Each evalExpr In Me.Pattern
-                answers.Clear()
-
-                Dim res = evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers)
-                If res.sccess Then
-                    Return (True, 0)
-                ElseIf res.shift < shift Then
-                    shift = res.shift
+        ''' <summary>
+        ''' 単純ルートかを確認する。
+        ''' </summary>
+        ''' <param name="ruleTable">ルールテーブル。</param>
+        Public Sub CheckSimpleRoute(ruleTable As SortedDictionary(Of String, RuleAnalysis))
+            Dim nd = Me._root
+            Do While True
+                If nd.IsRetry Then
+                    Me._isSimple = False
+                    Exit Do
                 End If
-            Next
 
-            snap.Restore()
-            Return (False, shift)
+                Select Case nd.Routes.Count
+                    Case 0
+                        ' 終端ノードの場合、単純ルート
+                        Me._isSimple = True
+                        Exit Do
+                    Case 1
+                        nd = nd.Routes(0).NextNode
+                    Case Else
+                        ' 複数ルートの場合、分岐ルート
+                        Me._isSimple = False
+                        Exit Do
+                End Select
+            Loop
+        End Sub
+
+        ''' <summary>
+        ''' 文字列表現を取得する。
+        ''' </summary>
+        ''' <returns>文字列表現。</returns>
+        Public Overrides Function ToString() As String
+            Return $"<{Me.RuleName}>"
         End Function
 
         ''' <summary>評価ノード。</summary>
@@ -398,6 +429,15 @@ Namespace EBNF
                 Me.Range = range
                 Me.Routes = New List(Of Node)()
             End Sub
+
+            ''' <summary>
+            ''' 文字列表現を取得する。
+            ''' </summary>
+            ''' <returns>文字列表現。</returns>
+            Overrides Function ToString() As String
+                Return $"-> {Me.Id} {Me.Range}"
+            End Function
+
         End Structure
 
         ''' <summary>ノードリスト。</summary>

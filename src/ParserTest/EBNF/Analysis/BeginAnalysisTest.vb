@@ -30,7 +30,7 @@ Namespace Analysis
             Dim analysis As New BeginAnalysis(range)
             Dim tr = New PositionAdjustStringReader("test input")
             Dim env As New EBNFEnvironment()
-            Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
+            Dim ruleTable As New SortedDictionary(Of String, OldRuleAnalysis)()
             Dim specialMethods As New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
             Dim answers As New List(Of EBNFAnalysisItem)()
 
@@ -49,7 +49,7 @@ Namespace Analysis
             Dim analysis As New BeginAnalysis(range)
             Dim tr = New PositionAdjustStringReader("test input")
             Dim env As New EBNFEnvironment()
-            Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
+            Dim ruleTable As New SortedDictionary(Of String, OldRuleAnalysis)()
             Dim specialMethods As New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
             Dim answers As New List(Of EBNFAnalysisItem)()
             Dim initialPosition = tr.Position
@@ -68,7 +68,7 @@ Namespace Analysis
             Dim analysis As New BeginAnalysis(range)
             Dim tr = New PositionAdjustStringReader("")
             Dim env As New EBNFEnvironment()
-            Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
+            Dim ruleTable As New SortedDictionary(Of String, OldRuleAnalysis)()
             Dim specialMethods As New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
             Dim answers As New List(Of EBNFAnalysisItem)()
 
@@ -87,7 +87,7 @@ Namespace Analysis
             Dim analysis As New BeginAnalysis(range)
             Dim tr = New PositionAdjustStringReader("test")
             Dim env As New EBNFEnvironment()
-            Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
+            Dim ruleTable As New SortedDictionary(Of String, OldRuleAnalysis)()
             Dim specialMethods As New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
             Dim answers As New List(Of EBNFAnalysisItem)()
 
@@ -106,7 +106,7 @@ Namespace Analysis
             Dim analysis As New BeginAnalysis(range)
             Dim tr = New PositionAdjustStringReader("test input")
             Dim env As New EBNFEnvironment()
-            Dim ruleTable As New SortedDictionary(Of String, RuleAnalysis)()
+            Dim ruleTable As New SortedDictionary(Of String, OldRuleAnalysis)()
             Dim specialMethods As New SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean))()
             Dim answers As New List(Of EBNFAnalysisItem)()
             Dim initialCount = answers.Count

@@ -111,7 +111,7 @@ lhs = identifier ;
 rule = lhs , S , ""="" , S , rhs , S , terminator ;
 
 grammar = ( S , rule , S ) * ;"
-        Dim answer = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", input)
+        Dim answer = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", input)
     End Sub
 
     <Fact>
@@ -121,7 +121,7 @@ grammar = ( S , rule , S ) * ;"
 add_or_sub = digit, { S, ('+' | '-'), S, digit };
 S = { ' ' } ;
 grammar = add_or_sub;"
-        Dim answer = EBNFSyntaxAnalysis.CompileToEvaluate(
+        Dim answer = OldEBNFSyntaxAnalysis.CompileToEvaluate(
             input,
             Sub(env)
                 env.Add(
@@ -146,7 +146,7 @@ grammar = add_or_sub;"
     <Fact>
     Public Sub NumberTest1()
         Dim input = "number = ? Number ?;"
-        Dim env = EBNFSyntaxAnalysis.CompileToEvaluate(input, "number", "+1.0")
+        Dim env = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "number", "+1.0")
         Assert.Equal("+1.0", env.Answer.ToString())
         Dim ans2 = env.Evaluate("number", "3.1415")
         Assert.Equal("3.1415", ans2.ToString())
@@ -189,7 +189,7 @@ add_or_sub = multi_or_div, {S, ('+' | '-'), S, multi_or_div};
 S = {? Space ?};
 grammar = add_or_sub;"
 
-        Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
+        Dim analysised1 = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
         Dim answer1 = EBNFEvaluate.Run(Of Integer)(analysised1, AddressOf Evaluate2)
         Assert.Equal(9, answer1)
     End Sub
@@ -255,7 +255,7 @@ quo_blk = ""'"", (? All Char ? - ""'"")+, ""'"";
 add_or_sub = quo_blk, {S, '+', S, quo_blk};
 grammar = add_or_sub;"
 
-        Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "'あいう' + 'えお'")
+        Dim analysised1 = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "'あいう' + 'えお'")
         Dim answer1 = EBNFEvaluate.Run(Of String)(analysised1, AddressOf Evaluate3)
         Assert.Equal("あいうえお", answer1)
     End Sub
@@ -305,7 +305,7 @@ grammar = add_or_sub;"
         'Dim range = expr.Match(New PositionAdjustStringReader(input))
         'CreateRuleTable(range)
 
-        Dim analysised1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
+        Dim analysised1 = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "grammar", "1 + 2 * (3 - 4 + 5)")
         Dim answer1 = EBNFEvaluate.Run(Of Integer)(analysised1, AddressOf Evaluate2)
         Assert.Equal(9, answer1)
     End Sub
@@ -319,13 +319,13 @@ last = number, number, number, number;
 number = ""0"" | ""1"" | ""2"" | ""3"" | ""4"" | ""5"" | ""6"" | ""7"" | ""8"" | ""9"" ;
 tel = [area, ""-""], mid, [""-""], last;"
 
-        Dim ans1 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "9482908")
+        Dim ans1 = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "9482908")
         Dim ans1_1 = ans1.Answer("mid")
         Assert.Equal("948", ans1_1.ToString())
         Dim ans1_2 = ans1.Answer("last")
         Assert.Equal("2908", ans1_2.ToString())
 
-        Dim ans2 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "03-9482908")
+        Dim ans2 = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "03-9482908")
         Dim ans2_1 = ans2.Answer("area")
         Assert.Equal("03", ans2_1.ToString())
         Dim ans2_2 = ans2.Answer("mid")
@@ -333,7 +333,7 @@ tel = [area, ""-""], mid, [""-""], last;"
         Dim ans2_3 = ans2.Answer("last")
         Assert.Equal("2908", ans2_3.ToString())
 
-        Dim ans3 = EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "03-948-2908")
+        Dim ans3 = OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "03-948-2908")
         Dim ans3_1 = ans3.Answer("area")
         Assert.Equal("03", ans3_1.ToString())
         Dim ans3_2 = ans3.Answer("mid")
@@ -343,13 +343,13 @@ tel = [area, ""-""], mid, [""-""], last;"
 
         Assert.Throws(Of EBNFException)(
             Sub()
-                EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "948-AABB")
+                OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "948-AABB")
             End Sub
         )
 
         Assert.Throws(Of EBNFException)(
             Sub()
-                EBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "94P-AABB")
+                OldEBNFSyntaxAnalysis.CompileToEvaluate(input, "tel", "94P-AABB")
             End Sub
         )
     End Sub

@@ -27,7 +27,7 @@ Namespace EBNF
         ''' <returns>解析が成功した場合に True を返します。</returns>
         Function Match(tr As IPositionAdjustReader,
                        env As EBNFEnvironment,
-                       ruleTable As SortedDictionary(Of String, RuleAnalysis),
+                       ruleTable As SortedDictionary(Of String, OldRuleAnalysis),
                        specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
                        ruleName As String,
                        answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer)

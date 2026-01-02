@@ -3,12 +3,13 @@ Option Strict On
 
 Imports ZoppaLibrary.BNF
 
-Namespace ABNF
+Namespace EBNF
 
     ''' <summary>
     ''' ルールのコンパイル済み式を表します。
     ''' </summary>
-    Public NotInheritable Class RuleAnalysis
+    Public NotInheritable Class OldRuleAnalysis
+        Implements IAnalysis
 
         ''' <summary>
         ''' 解析ノードのルート。
@@ -22,19 +23,10 @@ Namespace ABNF
         Public ReadOnly Property RuleName As String
 
         ''' <summary>
-        ''' 単純ルートか。
+        ''' ルールのパターンを取得する。
         ''' </summary>
-        Private _isSimple As Boolean = True
-
-        ''' <summary>
-        ''' ルートの取得。
-        ''' </summary>
-        ''' <returns>ルート。</returns>
-        Public ReadOnly Property Routes As List(Of AnalysisNode.Route)
-            Get
-                Return Me._root.Routes
-            End Get
-        End Property
+        ''' <returns>ルールのパターン。</returns>
+        Public ReadOnly Property Pattern As List(Of IAnalysis) Implements IAnalysis.Pattern
 
         ''' <summary>
         ''' コンストラクタ。
@@ -64,43 +56,49 @@ Namespace ABNF
             pattern.Add(endNode.Id, New NodeLink(endNode))
 
             ' 評価用グラフを作成
-            ' 1. 評価ノードを作成
-            ' 2. ルートを接続
-            Dim analysis As New SortedDictionary(Of Integer, AnalysisNode)() ' 1
+            Dim links As New SortedDictionary(Of Integer, IAnalysis)()
             For Each kvp In pattern
                 With kvp.Value.StartNode
-                    Dim ana = AnalysisNode.Create(.Id, .Range)
-                    analysis.Add(ana.Id, ana)
+                    Dim ana As IAnalysis = Nothing
+                    If .Id = endNode.Id Then
+                        ana = CompletedAnalysis.Instance
+                    ElseIf .Id = startNode.Id Then
+                        ana = New BeginAnalysis(.Range)
+                    Else
+                        Select Case .Range.Expr.GetType()
+                            'Case GetType(FactorExpression) ' 要素式
+                            '    ana = New FactorAnalysis(.Range)
+                            'Case GetType(IdentifierExpression) ' 識別子式
+                            '    ana = New IdentifierAnalysis(.Range)
+                            'Case GetType(SpecialSeqExpression) ' 特殊式
+                            '    ana = New SpecialSeqAnalysis(.Range)
+                            'Case GetType(TerminalExpression) ' 終端記号
+                            '    ana = New TerminalAnalysis(.Range)
+                            Case Else
+                                Throw New NotSupportedException($"サポートされていない式タイプです: { .Range.Expr.GetType().FullName }")
+                        End Select
+                    End If
+                    links.Add(.Id, ana)
                 End With
             Next
-            For Each kvp In pattern ' 2
-                For Each edge In kvp.Value.EndNodes
-                    If analysis.ContainsKey(edge.Item1.Id) Then
-                        analysis(kvp.Key).AddRoute(analysis(edge.Item1.Id), edge.Item2, edge.Item3)
+            For Each kvp In pattern
+                For Each endNode In kvp.Value.EndNodes
+                    If links.ContainsKey(endNode.Id) Then
+                        links(kvp.Key).Pattern.Add(links(endNode.Id))
                     End If
                 Next
             Next
 
-            Me._root = analysis(startNode.Id)
+            Me.Pattern = links(startNode.Id).Pattern
         End Sub
 
         ''' <summary>
-        ''' コンストラクタ。
+        ''' 文字列表現を取得する。
         ''' </summary>
-        ''' <param name="name">ルール名。</param>
-        ''' <param name="method">マッチ対象を判定する関数。</param>
-        Public Sub New(name As String, method As Func(Of PositionAdjustBytes, Boolean))
-            Me.RuleName = name
-
-            ' ルートを作成
-            Dim startNode = AnalysisNode.Create(0, ExpressionRange.Invalid)
-            Dim methodNode = AnalysisNode.Create(1, name, method)
-            Dim endNode = AnalysisNode.Create(2, ExpressionRange.Invalid)
-            startNode.AddRoute(methodNode, 0, Integer.MaxValue)
-            methodNode.AddRoute(endNode, 0, Integer.MaxValue)
-
-            Me._root = startNode
-        End Sub
+        ''' <returns>文字列表現。</returns>
+        Public Overrides Function ToString() As String
+            Return $"<{Me.RuleName}>"
+        End Function
 
 #Region "ルート作成"
 
@@ -118,7 +116,7 @@ Namespace ABNF
                               AlternationRoute(nodes, target),
                               CreateRoute(nodes, target.SubRanges(0)))
 
-                Case GetType(CharValExpression)
+                Case GetType(CharacterExpression)
                     ' 文字式
                     Return DirectRoute(nodes, target)
 
@@ -128,38 +126,50 @@ Namespace ABNF
                               ConcatenationRoute(nodes, target),
                               CreateRoute(nodes, target.SubRanges(0)))
 
-                Case GetType(GroupExpression)
-                    ' グループ式
-                    Return CreateRoute(nodes, target.SubRanges(0))
-
-                Case GetType(OptionExpression)
-                    ' オプション式
-                    Return RangeRoute(nodes, target.SubRanges(0), 0, 1)
-
-                Case GetType(RepetitionExpression)
-                    ' 反復式
+                Case GetType(FactorExpression)
+                    ' 要素式
                     If target.SubRanges.Count > 1 Then
-                        Dim minRange = target.SubRanges(0).SubRanges(0)
-                        Dim maxRange = target.SubRanges(0).SubRanges(1)
-
-                        Dim minCount = If(minRange.Enable, Integer.Parse(minRange.ToString()), 0)
-                        Dim maxCount = If(maxRange.Enable, Integer.Parse(maxRange.ToString()), Integer.MaxValue)
-
-                        Return RangeRoute(nodes, target.SubRanges(1), minCount, maxCount)
+                        Select Case target.SubRanges(1).ToString()
+                            Case "?"c
+                                Return ZeroOrOneRoute(nodes, target.SubRanges(0))
+                            Case "*"c
+                                Return ZeroOrMoreRoute(nodes, target.SubRanges(0))
+                            Case "+"c
+                                Return OneOrMoreRoute(nodes, target.SubRanges(0))
+                            Case Else
+                                ' 否定式
+                                Return DirectRoute(nodes, target)
+                        End Select
                     Else
                         Return CreateRoute(nodes, target.SubRanges(0))
                     End If
 
-                Case GetType(RuleNameExpression)
-                    ' ルール名式
+                Case GetType(IdentifierExpression)
+                    ' 識別子式
                     Return DirectRoute(nodes, target)
 
-                Case GetType(ProseValExpression)
-                    ' 散文式
+                Case GetType(SpecialSeqExpression)
+                    ' 特殊式
                     Return DirectRoute(nodes, target)
 
-                Case GetType(NumValExpression)
-                    ' 数値式
+                Case GetType(TermExpression)
+                    ' 終端式
+                    Select Case target.SubRanges(0).Expr.GetType()
+                        Case GetType(TerminalExpression), GetType(IdentifierExpression)
+                            Return CreateRoute(nodes, target.SubRanges(0))
+                        Case Else
+                            Select Case target.SubChar(0)
+                                Case "["c
+                                    Return ZeroOrOneRoute(nodes, target.SubRanges(0))
+                                Case "{"c
+                                    Return ZeroOrMoreRoute(nodes, target.SubRanges(0))
+                                Case Else
+                                    Return CreateRoute(nodes, target.SubRanges(0))
+                            End Select
+                    End Select
+
+                Case GetType(TerminalExpression)
+                    ' 終端記号
                     Return DirectRoute(nodes, target)
 
                 Case Else
@@ -222,43 +232,61 @@ Namespace ABNF
         End Function
 
         ''' <summary>
-        ''' 範囲ルートを作成します。
+        ''' 0回または1回のルートを作成します。
         ''' </summary>
         ''' <param name="nodes">ノードリスト。</param>
         ''' <param name="target">式の範囲。</param>
-        ''' <param name="minCount">最小回数。</param>
-        ''' <param name="maxCount">最大回数。</param>
         ''' <returns>接続点。</returns>
-        Private Shared Function RangeRoute(nodes As NodeList, target As ExpressionRange, minCount As Integer, maxCount As Integer) As (st As Node, ed As Node)
+        Private Shared Function ZeroOrOneRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
             Dim startNode = nodes.NewNode()
             Dim midRoute = CreateRoute(nodes, target)
-            Dim endNode1 = nodes.NewNode()
-            Dim endNode2 = nodes.NewNode()
+            Dim endNode = nodes.NewNode()
+
+            ' 開始点から中間点、中間点から終了点、開始点から終了点へ接続
+            startNode.Routes.Add(midRoute.st)
+            midRoute.ed.Routes.Add(endNode)
+            startNode.Routes.Add(endNode)
+
+            Return (startNode, endNode)
+        End Function
+
+        ''' <summary>
+        ''' 0回以上のルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function ZeroOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode()
+            Dim midRoute = CreateRoute(nodes, target)
+            Dim endNode = nodes.NewNode()
 
             ' 開始点から中間点、中間点から終了点、開始点と終了点の相互へ接続
             startNode.Routes.Add(midRoute.st)
-            midRoute.st.MinLimit = 0
-            midRoute.st.MaxLimit = maxCount
+            startNode.Routes.Add(endNode)
+            midRoute.ed.Routes.Add(endNode)
+            endNode.Routes.Add(startNode)
 
-            ' 開始点から終了点へ直接接続
-            If minCount <= 0 Then
-                startNode.Routes.Add(endNode2)
-            End If
+            Return (startNode, endNode)
+        End Function
 
-            ' 中間点から終了点へ接続
-            midRoute.ed.Routes.Add(endNode2)
-            midRoute.ed.Routes.Add(endNode1)
+        ''' <summary>
+        ''' 1回以上のルートを作成します。
+        ''' </summary>
+        ''' <param name="nodes">ノードリスト。</param>
+        ''' <param name="target">式の範囲。</param>
+        ''' <returns>接続点。</returns>
+        Private Shared Function OneOrMoreRoute(nodes As NodeList, target As ExpressionRange) As (st As Node, ed As Node)
+            Dim startNode = nodes.NewNode()
+            Dim midRoute = CreateRoute(nodes, target)
+            Dim endNode = nodes.NewNode()
 
-            ' 終了点から開始点へ接続（ループ）
-            If maxCount > 1 Then
-                endNode1.Routes.Add(startNode)
-            End If
+            ' 開始点から中間点、中間点から終了点、終了点から開始点へ接続
+            startNode.Routes.Add(midRoute.st)
+            midRoute.ed.Routes.Add(endNode)
+            endNode.Routes.Add(startNode)
 
-            ' 回数制限を設定
-            endNode2.MinLimit = minCount
-            endNode2.MaxLimit = Integer.MaxValue
-
-            Return (startNode, endNode2)
+            Return (startNode, endNode)
         End Function
 
 #End Region
@@ -276,10 +304,9 @@ Namespace ABNF
                                          endNode As Node)
             Dim res As New NodeLink(startNode)
             Dim arrived As New HashSet(Of Integer)()
-            CreatePattern(res, arrived, startNode, endNode, 0, Integer.MaxValue)
+            CreatePattern(res, arrived, startNode, endNode)
             pattern.Add(startNode.Id, res)
         End Sub
-
 
         ''' <summary>
         ''' パターンを作成します。
@@ -291,22 +318,16 @@ Namespace ABNF
         Private Shared Sub CreatePattern(pattern As NodeLink,
                                          arrived As HashSet(Of Integer),
                                          startNode As Node,
-                                         endNode As Node,
-                                         minLimit As Integer,
-                                         maxLimit As Integer)
+                                         endNode As Node)
             For Each nd In startNode.Routes
                 If Not arrived.Contains(nd.Id) Then
                     arrived.Add(nd.Id)
-
-                    Dim minLmt = Math.Max(minLimit, nd.MinLimit)
-                    Dim maxLmt = Math.Min(maxLimit, nd.MaxLimit)
-
                     If nd.Id = endNode.Id Then
-                        pattern.EndNodes.Add((nd, minLmt, maxLmt))
+                        pattern.EndNodes.Add(nd)
                     ElseIf nd.IsEpsilon Then
-                        CreatePattern(pattern, arrived, nd, endNode, minLmt, maxLmt)
+                        CreatePattern(pattern, arrived, nd, endNode)
                     Else
-                        pattern.EndNodes.Add((nd, minLmt, maxLmt))
+                        pattern.EndNodes.Add(nd)
                     End If
                 End If
             Next
@@ -315,55 +336,42 @@ Namespace ABNF
 #End Region
 
         ''' <summary>
-        ''' マッチャーを取得する。
+        ''' 解析を実行する。
         ''' </summary>
-        ''' <returns>マッチャー。</returns>
-        Public Function GetMatcher() As IAnalysisMatcher
-            Return If(
-                Me._isSimple,
-                CType(New SimpleAnalysisMatcher(Me._root, Me.RuleName), IAnalysisMatcher),
-                New AnalysisMatcher(Me._root, Me.RuleName)
-            )
-        End Function
+        ''' <param name="tr">位置調整リーダー。</param>
+        ''' <param name="env">解析環境。</param>
+        ''' <param name="ruleTable">ルール解析テーブル。</param>
+        ''' <param name="specialMethods">特殊メソッドテーブル。</param>
+        ''' <param name="ruleName">現在のルール名。</param>
+        ''' <param name="answers">解析結果のリスト。</param>
+        ''' <returns>解析が成功した場合に True を返します。</returns>
+        Public Function Match(tr As IPositionAdjustReader,
+                              env As EBNFEnvironment,
+                              ruleTable As SortedDictionary(Of String, OldRuleAnalysis),
+                              specialMethods As SortedDictionary(Of String, Func(Of IPositionAdjustReader, Boolean)),
+                              ruleName As String,
+                              answers As List(Of EBNFAnalysisItem)) As (sccess As Boolean, shift As Integer) Implements IAnalysis.Match
+            Dim snap = tr.MemoryPosition()
 
-        ''' <summary>
-        ''' 単純ルートかを確認する。
-        ''' </summary>
-        ''' <param name="ruleTable">ルールテーブル。</param>
-        Public Sub CheckSimpleRoute(ruleTable As SortedDictionary(Of String, RuleAnalysis))
-            Dim nd = Me._root
-            Do While True
-                If nd.IsRetry Then
-                    Me._isSimple = False
-                    Exit Do
+            ' ルールパターンを順に評価
+            Dim shift As Integer = Integer.MaxValue
+            For Each evalExpr In Me.Pattern
+                answers.Clear()
+
+                Dim res = evalExpr.Match(tr, env, ruleTable, specialMethods, ruleName, answers)
+                If res.sccess Then
+                    Return (True, 0)
+                ElseIf res.shift < shift Then
+                    shift = res.shift
                 End If
+            Next
 
-                Select Case nd.Routes.Count
-                    Case 0
-                        ' 終端ノードの場合、単純ルート
-                        Me._isSimple = True
-                        Exit Do
-                    Case 1
-                        nd = nd.Routes(0).NextNode
-                    Case Else
-                        ' 複数ルートの場合、分岐ルート
-                        Me._isSimple = False
-                        Exit Do
-                End Select
-            Loop
-        End Sub
-
-        ''' <summary>
-        ''' 文字列表現を取得する。
-        ''' </summary>
-        ''' <returns>文字列表現。</returns>
-        Public Overrides Function ToString() As String
-            Return $"<{Me.RuleName}>"
+            snap.Restore()
+            Return (False, shift)
         End Function
-
 
         ''' <summary>評価ノード。</summary>
-        Private NotInheritable Class Node
+        Private Structure Node
 
             ''' <summary>識別値。</summary>
             Public ReadOnly Property Id As Integer
@@ -377,12 +385,6 @@ Namespace ABNF
             ''' <summary>接続ルート。</summary>
             Public ReadOnly Property Routes As List(Of Node)
 
-            ''' <summary>最小出現回数。</summary>
-            Public Property MinLimit As Integer
-
-            ''' <summary>最大出現回数。</summary>
-            Public Property MaxLimit As Integer
-
             ''' <summary>コンストラクタ。</summary>
             ''' <param name="id">識別値。</param>
             Public Sub New(id As Integer)
@@ -390,8 +392,6 @@ Namespace ABNF
                 Me.IsEpsilon = True
                 Me.Range = ExpressionRange.Invalid
                 Me.Routes = New List(Of Node)()
-                Me.MinLimit = 0
-                Me.MaxLimit = Integer.MaxValue
             End Sub
 
             ''' <summary>コンストラクタ。</summary>
@@ -402,19 +402,8 @@ Namespace ABNF
                 Me.IsEpsilon = False
                 Me.Range = range
                 Me.Routes = New List(Of Node)()
-                Me.MinLimit = 0
-                Me.MaxLimit = Integer.MaxValue
             End Sub
-
-            ''' <summary>
-            ''' 文字列表現を取得する。
-            ''' </summary>
-            ''' <returns>文字列表現。</returns>
-            Overrides Function ToString() As String
-                Return $"-> {Me.Id} {Me.Range} [{Me.MinLimit}, {Me.MaxLimit}]"
-            End Function
-
-        End Class
+        End Structure
 
         ''' <summary>ノードリスト。</summary>
         Private NotInheritable Class NodeList
@@ -430,6 +419,7 @@ Namespace ABNF
             End Function
 
             ''' <summary>評価ノードを新規作成してリストに追加します。</summary>
+            ''' <returns>評価ノード。</returns>
             Public Function NewNode() As Node
                 Dim nd As New Node(Me.Count)
                 Me.Add(nd)
@@ -445,13 +435,13 @@ Namespace ABNF
             Public ReadOnly Property StartNode As Node
 
             ''' <summary>終了ノードリスト。</summary>
-            Public ReadOnly Property EndNodes As List(Of (Node, Integer, Integer))
+            Public ReadOnly Property EndNodes As List(Of Node)
 
             ''' <summary>コンストラクタ。</summary>
             ''' <param name="startNode">開始ノード。</param>
             Public Sub New(startNode As Node)
                 Me.StartNode = startNode
-                Me.EndNodes = New List(Of (Node, Integer, Integer))()
+                Me.EndNodes = New List(Of Node)()
             End Sub
 
         End Class
